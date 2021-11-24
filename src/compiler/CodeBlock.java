@@ -12,12 +12,13 @@ import compiler.reference_instructs.PlaceholderInstruction;
 
 import java.util.Set;
 
-import gbc_framework.constants.RomConstants;
+import gbc_framework.ByteBlock;
+import gbc_framework.RomConstants;
 import gbc_framework.rom_addressing.AssignedAddresses;
 import gbc_framework.rom_addressing.BankAddress;
 import gbc_framework.utils.RomUtils;
 
-public class DataBlock 
+public class CodeBlock implements ByteBlock
 {	
 	public static final String END_OF_DATA_BLOCK_SUBSEG_LABEL = "__end_of_data_block__";
 	LinkedHashMap<String, Segment> segments; // linked to keep order
@@ -30,13 +31,18 @@ public class DataBlock
 	
 	private static InstructionParser instructParserSingleton = new InstructionParser();
 	
+	public static void setInstructionParserSingleton(InstructionParser instructParserToUseForAllDataBlocks)
+	{
+		instructParserSingleton = instructParserToUseForAllDataBlocks;
+	}
+	
 	// Constructor to keep instruction/line less constructors from being ambiguous
-	public DataBlock(String startingSegmentName)
+	public CodeBlock(String startingSegmentName)
 	{
 		setDataBlockCommonData(startingSegmentName.trim());
 	}
 	
-	public DataBlock(List<String> sourceLines)
+	public CodeBlock(List<String> sourceLines)
 	{
 		List<String> sourceLinesTrimmed = new ArrayList<>(sourceLines);
 		String segName = CompilerUtils.tryParseSegmentName(sourceLinesTrimmed.remove(0));
@@ -50,11 +56,6 @@ public class DataBlock
 		{
 			parseLine(line);
 		}
-	}
-	
-	public static void setInstructionParserSingleton(InstructionParser instructParserToUseForAllDataBlocks)
-	{
-		instructParserSingleton = instructParserToUseForAllDataBlocks;
 	}
 	
 	private void setDataBlockCommonData(String id)
@@ -139,11 +140,6 @@ public class DataBlock
 		currSegment.appendInstruction(instruct);
 	}
 	
-	public String getId()
-	{
-		return id;
-	}
-	
 	public String getEndSegmentId()
 	{
 		return endSegmentName;
@@ -178,21 +174,143 @@ public class DataBlock
 		}
 		return segRefsById;
 	}
-	
+
+	public void replacePlaceholderIds(Map<String, String> placeholderToArgsForIds)
+	{
+		// Replace placeholders in Id
+		id = CompilerUtils.replacePlaceholders(id, placeholderToArgsForIds);
+		
+		LinkedHashMap<String, Segment> refreshedSegments = new LinkedHashMap<>();
+		// Use segments because we know we don't need to replace anything in the
+		// end segment placeholder
+		for (Entry<String, Segment> seg : segments.entrySet())
+		{
+			String segId = CompilerUtils.replacePlaceholders(seg.getKey(), placeholderToArgsForIds);
+			seg.getValue().fillPlaceholders(placeholderToArgsForIds, instructParserSingleton);
+			
+			if (refreshedSegments.put(segId, seg.getValue()) != null)
+			{
+				throw new IllegalArgumentException("Duplicate segment label was found while replacing placeholders: " + segId);
+			}
+		}
+		segments = refreshedSegments;
+	}
+
+	public void writeBytes(byte[] bytes, AssignedAddresses assignedAddresses)
+	{
+		// Don't need to write anything for the end of the segment
+		for (Entry<String, Segment> segEntry : segments.entrySet())
+		{
+			BankAddress segAddress = assignedAddresses.getThrow(segEntry.getKey());
+			segEntry.getValue().writeBytes(bytes, RomUtils.convertToGlobalAddress(segAddress), assignedAddresses);
+		}
+		
+		// End reference has no code so no writing needs to be done
+	}
+
+	@Override
+	public String getId()
+	{
+		return id;
+	}
+
+	@Override
 	public int getWorstCaseSize(AssignedAddresses assignedAddresses)
 	{
 		BankAddress blockAddress = assignedAddresses.getTry(getId());
 		return getSizeAndSegmentsRelativeAddresses(blockAddress, assignedAddresses, null, false); // null = don't care about the relative address of segments, false = do not include end segment
 	}
+
+	@Override
+	public void addAllIds(Set<String> usedIds)
+	{
+		// See if it already had an entry that is not this instance of the block
+		if (!usedIds.add(getId()))
+		{
+			throw new IllegalArgumentException("Duplicate block ID detected! There must be only " +
+					"one allocation block per data block: " + getId());
+		}
 	
-	public AssignedAddresses getSegmentsRelativeAddresses(BankAddress blockAddress, AssignedAddresses assignedAddresses)
+		// Add the references for its segments
+		for (String segmentId : getSegmentsById().keySet())
+		{
+			if (!segmentId.equals(getId()) && !usedIds.add(segmentId))
+			{
+				throw new IllegalArgumentException("Duplicate segment ID detected: " + segmentId);
+			}
+		}
+	}
+		
+	@Override
+	public void assignBank(byte bank, AssignedAddresses assignedAddresses)
+	{
+		for (String segId : getSegmentsById().keySet())
+		{
+			assignedAddresses.putBankOnly(segId, bank);
+		}
+	}
+
+	@Override
+	public void removeAddresses(AssignedAddresses assignedAddresses)
+	{
+		for (String segId : getSegmentsById().keySet())
+		{
+			assignedAddresses.remove(segId);
+		}
+	}
+
+	@Override
+	public void assignAddresses(BankAddress blockAddress, AssignedAddresses assignedAddresses) 
+	{
+		// Will throw if the addresses are invalid - means we can make some assumptions here
+		AssignedAddresses relAddresses = getSegmentsRelativeAddresses(blockAddress, assignedAddresses);
+		
+		// For each segment relative address, offset it to the block address and add it to the
+		// allocated indexes		
+		String segmentId;
+		Iterator<String> segItr = getSegmentIds().iterator();
+		while (segItr.hasNext())
+		{
+			segmentId = segItr.next();
+			BankAddress relAddress = relAddresses.getThrow(segmentId);
+			int addressInBank = relAddress.getAddressInBank() + blockAddress.getAddressInBank();
+			// Make sure we didn't pass the end of the bank
+			if (addressInBank > RomConstants.BANK_SIZE)
+			{
+				throw new RuntimeException("assignBlockAndSegmentBankAddresses Passed the end of a bank "
+						+ "while assigning addresses for segment (" + segmentId + "). Each data block "
+						+ "should fit assuming the blocks were successfully packed in earlier stages");
+			}
+			// If its the end of the bank, its ok if its the last segment or the next segment
+			// is the end of block placeholder segment
+			else if (addressInBank == RomConstants.BANK_SIZE)
+			{
+				if (!segItr.hasNext() || segItr.next().equals(getEndSegmentId()))
+				{
+					assignedAddresses.put(segmentId, (byte) (relAddress.getBank() + 1), (short) 0);
+				}
+				else
+				{
+					throw new RuntimeException("assignBlockAndSegmentBankAddresses Reached the end of a bank while "
+							+ "assigning addresses but there is still a segment (" + segmentId + ") to assign. Each "
+							+ "data block should fit assuming the blocks were successfully packed in earlier stages");
+				}
+			}
+			else
+			{
+				assignedAddresses.put(segmentId, relAddress.getBank(), (short) addressInBank);
+			}
+		}
+	}
+	
+	private AssignedAddresses getSegmentsRelativeAddresses(BankAddress blockAddress, AssignedAddresses assignedAddresses)
 	{
 		AssignedAddresses relAddresses = new AssignedAddresses();
 		getSizeAndSegmentsRelativeAddresses(blockAddress, assignedAddresses, relAddresses, true); // true = include end segment
 		return relAddresses;
 	}
 	
-	protected int getSizeAndSegmentsRelativeAddresses(
+	private int getSizeAndSegmentsRelativeAddresses(
 			BankAddress blockAddress, 
 			AssignedAddresses assignedAddresses, 
 			AssignedAddresses relAddresses,
@@ -375,38 +493,5 @@ public class DataBlock
 				nextSegRelAddress = nextSegRelAddress.newOffsetted(segSize);
 			}
 		}
-	}
-	
-	public void replacePlaceholderIds(Map<String, String> placeholderToArgsForIds)
-	{
-		// Replace placeholders in Id
-		id = CompilerUtils.replacePlaceholders(id, placeholderToArgsForIds);
-		
-		LinkedHashMap<String, Segment> refreshedSegments = new LinkedHashMap<>();
-		// Use segments because we know we don't need to replace anything in the
-		// end segment placeholder
-		for (Entry<String, Segment> seg : segments.entrySet())
-		{
-			String segId = CompilerUtils.replacePlaceholders(seg.getKey(), placeholderToArgsForIds);
-			seg.getValue().fillPlaceholders(placeholderToArgsForIds, instructParserSingleton);
-			
-			if (refreshedSegments.put(segId, seg.getValue()) != null)
-			{
-				throw new IllegalArgumentException("Duplicate segment label was found while replacing placeholders: " + segId);
-			}
-		}
-		segments = refreshedSegments;
-	}
-
-	public void writeBytes(byte[] bytes, AssignedAddresses assignedAddresses)
-	{
-		// Don't need to write anything for the end of the segment
-		for (Entry<String, Segment> segEntry : segments.entrySet())
-		{
-			BankAddress segAddress = assignedAddresses.getThrow(segEntry.getKey());
-			segEntry.getValue().writeBytes(bytes, RomUtils.convertToGlobalAddress(segAddress), assignedAddresses);
-		}
-		
-		// End reference has no code so no writing needs to be done
 	}
 }

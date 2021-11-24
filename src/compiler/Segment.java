@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 import compiler.reference_instructs.PlaceholderInstruction;
-import gbc_framework.constants.RomConstants;
+import gbc_framework.RomConstants;
 import gbc_framework.rom_addressing.AssignedAddresses;
 import gbc_framework.rom_addressing.BankAddress;
 
