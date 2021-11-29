@@ -222,23 +222,18 @@ public class CodeBlock implements ByteBlock
 	}
 
 	@Override
-	public void addAllIds(Set<String> usedIds)
-	{
-		// See if it already had an entry that is not this instance of the block
-		if (!usedIds.add(getId()))
-		{
-			throw new IllegalArgumentException("Duplicate block ID detected! There must be only " +
-					"one allocation block per data block: " + getId());
-		}
-	
+	public boolean addAllIds(Set<String> usedIds)
+	{	
 		// Add the references for its segments
 		for (String segmentId : getSegmentsById().keySet())
 		{
-			if (!segmentId.equals(getId()) && !usedIds.add(segmentId))
+			if (!usedIds.add(segmentId))
 			{
-				throw new IllegalArgumentException("Duplicate segment ID detected: " + segmentId);
+				return false;
 			}
 		}
+		
+		return true;
 	}
 		
 	@Override
@@ -260,15 +255,17 @@ public class CodeBlock implements ByteBlock
 	}
 
 	@Override
-	public void assignAddresses(BankAddress blockAddress, AssignedAddresses assignedAddresses) 
+	public BankAddress assignAddresses(BankAddress blockAddress, AssignedAddresses assignedAddresses) 
 	{
 		// Will throw if the addresses are invalid - means we can make some assumptions here
 		AssignedAddresses relAddresses = getSegmentsRelativeAddresses(blockAddress, assignedAddresses);
 		
 		// For each segment relative address, offset it to the block address and add it to the
-		// allocated indexes		
+		// allocated indexes	
+		// Note that these will be in the correct order and will have the end segment label
 		String segmentId;
 		Iterator<String> segItr = getSegmentIds().iterator();
+		BankAddress lastAddress = blockAddress;
 		while (segItr.hasNext())
 		{
 			segmentId = segItr.next();
@@ -298,9 +295,12 @@ public class CodeBlock implements ByteBlock
 			}
 			else
 			{
-				assignedAddresses.put(segmentId, relAddress.getBank(), (short) addressInBank);
+				lastAddress = new BankAddress(blockAddress.getBank(), (short) addressInBank);
+				assignedAddresses.put(segmentId, lastAddress);
 			}
 		}
+		
+		return lastAddress;
 	}
 	
 	private AssignedAddresses getSegmentsRelativeAddresses(BankAddress blockAddress, AssignedAddresses assignedAddresses)
