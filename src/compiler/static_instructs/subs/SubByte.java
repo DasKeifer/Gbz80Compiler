@@ -1,5 +1,8 @@
 package compiler.static_instructs.subs;
 
+import java.io.IOException;
+
+import gbc_framework.SegmentedWriter;
 import compiler.static_instructs.Sub;
 
 public class SubByte extends Sub
@@ -12,10 +15,13 @@ public class SubByte extends Sub
 		super(SIZE);
 		this.val = val;
 	}
-	
-	public void writeStaticBytes(byte[] bytes, int indexToWriteAt)
+
+	@Override
+	public void writeStaticBytes(SegmentedWriter writer) throws IOException
 	{
-		bytes[indexToWriteAt++] = (byte) 0xD6;
-		bytes[indexToWriteAt] = val;
+		writer.append(
+				(byte) 0xD6, 
+				val
+		);
 	}
 }

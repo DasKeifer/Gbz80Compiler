@@ -5,8 +5,10 @@ import compiler.CompilerConstants.InstructionConditions;
 import gbc_framework.rom_addressing.AssignedAddresses;
 import gbc_framework.rom_addressing.BankAddress;
 
+import java.io.IOException;
 import java.util.Arrays;
 
+import gbc_framework.SegmentedWriter;
 import compiler.CompilerUtils;
 import compiler.Instruction;
 import gbc_framework.utils.ByteUtils;
@@ -200,9 +202,8 @@ public abstract class JumpCallCommon implements Instruction
 	}
 	
 	@Override
-	public int writeBytes(byte[] bytes, int addressToWriteAt, AssignedAddresses assignedAddresses) 
-	{
-		int writeIdx = addressToWriteAt;
+	public int writeBytes(SegmentedWriter writer, BankAddress instructionAddress, AssignedAddresses assignedAddresses) throws IOException 
+	{	
 		BankAddress toGoToAddress = getAddressToGoTo(assignedAddresses, null);
 		if (!toGoToAddress.isFullAddress())
 		{
@@ -213,71 +214,72 @@ public abstract class JumpCallCommon implements Instruction
 			throw new IllegalAccessError("JumpCallCommon tried to write specific address but it is not fully assigned: " + addressToGoTo.toString());
 		}
 		
-		if (isFarJpCall(new BankAddress(addressToWriteAt), toGoToAddress))
+		if (isFarJpCall(instructionAddress, toGoToAddress))
 		{			
+			int writeSize = 0;
 			// To do a conditional far jp/call we need to do a JR before it
 			if (conditions != InstructionConditions.NONE)
 			{
 				// Write a local JR to skip the farcall/jp
-				writeIdx += writeJr(bytes, writeIdx, (byte) 4);
+				writeSize += writeJr(writer, instructionAddress, (byte) 4);
 			}
 			
-			writeIdx += writeFarJpCall(bytes, writeIdx, toGoToAddress);
-			return writeIdx - addressToWriteAt;
+			writeSize += writeFarJpCall(writer, instructionAddress, toGoToAddress);
+			return writeSize;
 		}
 		else
 		{
-			return writeJpCall(bytes, writeIdx, toGoToAddress);
+			return writeJpCall(writer, instructionAddress, toGoToAddress);
 		}
 	}
 	
-	protected int writeJpCall(byte[] bytes, int indexToAddAt, BankAddress addressToGoTo)
+	protected int writeJpCall(SegmentedWriter writer, BankAddress instructionAddress, BankAddress addressToGoTo) throws IOException 
 	{		
 		// always call
 		if (InstructionConditions.NONE == conditions)
 		{
-			bytes[indexToAddAt] = conditionlessInstruct;
+			writer.append(conditionlessInstruct);
 		}
 		// Conditional call
 		else
 		{
-			bytes[indexToAddAt] = (byte) (conditionedInstruct | ((conditions.getValue() << 3) & 0xff)); 
+			writer.append((byte) (conditionedInstruct | ((conditions.getValue() << 3) & 0xff)));
 		}
 		
 		// Now write the local address
-		ByteUtils.writeAsShort(RomUtils.convertFromBankOffsetToLoadedOffset(addressToGoTo), bytes, indexToAddAt + 1);
+		writer.append(ByteUtils.shortToLittleEndianBytes(RomUtils.convertFromBankOffsetToLoadedOffset(addressToGoTo)));
 		return 3;
 	}
 
-	protected int writeFarJpCall(byte[] bytes, int indexToAddAt, BankAddress addressToGoTo)
+	protected int writeFarJpCall(SegmentedWriter writer, BankAddress instructionAddress, BankAddress addressToGoTo) throws IOException 
 	{		
 		// This is an "RST" call (id 0xC7). These are special calls loaded into the ROM at the beginning. For
 		// this ROM, RST5 (id 0x28) jumps to the "FarCall" function in the home.asm which handles
 		// doing the call to any location in the ROM
-		bytes[indexToAddAt] = (byte) (0xC7 | farInstuctRstVal); 
+		writer.append((byte) (0xC7 | farInstuctRstVal)); 
 		
 		// Now write the rest of the address
-		bytes[indexToAddAt + 1] = addressToGoTo.getBank();
-		ByteUtils.writeAsShort(RomUtils.convertFromBankOffsetToLoadedOffset(addressToGoTo), bytes, indexToAddAt + 2);
+		writer.append(addressToGoTo.getBank());
+		writer.append(ByteUtils.shortToLittleEndianBytes(RomUtils.convertFromBankOffsetToLoadedOffset(addressToGoTo)));
 		return 4;
 	}
 	
-	protected int writeJr(byte[] bytes, int indexToAddAt, byte relAddress)
+	protected int writeJr(SegmentedWriter writer, BankAddress instructionAddress, byte relAddress) throws IOException 
 	{
-		writeJr(bytes, indexToAddAt, conditions, relAddress);
+		writeJr(writer, conditions, relAddress);
 		return 2;
 	}	
 	
-	public static void writeJr(byte[] bytes, int indexToAddAt, InstructionConditions conditions, byte relAddress)
+	public static void writeJr(SegmentedWriter writer, InstructionConditions conditions, byte relAddress) throws IOException 
 	{
 		if (InstructionConditions.NONE == conditions)
 		{
-			bytes[indexToAddAt] = 0x18;
+			writer.append((byte) 0x18);
 		}
 		else
 		{
-			bytes[indexToAddAt] = (byte) (0x20 | (conditions.getValue() << 3));
+			writer.append((byte) (0x20 | (conditions.getValue() << 3)));
 		}
-		bytes[indexToAddAt + 1] = relAddress;
+		writer.append(relAddress);
 	}
 }

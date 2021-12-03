@@ -1,8 +1,10 @@
 package compiler.reference_instructs;
 
 
+import java.io.IOException;
 import java.util.Map;
 
+import gbc_framework.SegmentedWriter;
 import compiler.CompilerUtils;
 import compiler.Instruction;
 import compiler.InstructionParser;
@@ -48,12 +50,12 @@ public class PlaceholderInstruction implements Instruction
 	}
 
 	@Override
-	public int writeBytes(byte[] bytes, int addressToWriteAt, AssignedAddresses assignedAddresses) 
+	public int writeBytes(SegmentedWriter writer, BankAddress instructionAddress, AssignedAddresses assignedAddresses) throws IOException 
 	{
 		if (inst == null)
 		{
 			throw new IllegalArgumentException("Cannot write placeholder instructions! Must replace all values in it");
 		}
-		return inst.writeBytes(bytes, addressToWriteAt, assignedAddresses);
+		return inst.writeBytes(writer, instructionAddress, assignedAddresses);
 	}
 }

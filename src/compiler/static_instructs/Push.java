@@ -1,7 +1,9 @@
 package compiler.static_instructs;
 
+import java.io.IOException;
 import java.util.Arrays;
 
+import gbc_framework.SegmentedWriter;
 import compiler.CompilerUtils;
 import compiler.StaticInstruction;
 import compiler.CompilerConstants.PushPopRegisterPair;
@@ -39,9 +41,10 @@ public class Push extends StaticInstruction
 
 		throw new IllegalArgumentException(SUPPORT_STRING + Arrays.toString(args));
 	}
-	
-	public void writeStaticBytes(byte[] bytes, int indexToWriteAt)
+
+	@Override
+	public void writeStaticBytes(SegmentedWriter writer) throws IOException
 	{
-		bytes[indexToWriteAt] = (byte) (0xC5 | pair.getValue() << 4);
+		writer.append((byte) (0xC5 | pair.getValue() << 4));
 	}
 }

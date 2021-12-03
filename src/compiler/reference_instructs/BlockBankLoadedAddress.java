@@ -1,6 +1,9 @@
 package compiler.reference_instructs;
 
 
+import java.io.IOException;
+
+import gbc_framework.SegmentedWriter;
 import compiler.FixedLengthInstruct;
 import gbc_framework.rom_addressing.AssignedAddresses;
 import gbc_framework.rom_addressing.BankAddress;
@@ -22,7 +25,7 @@ public class BlockBankLoadedAddress extends FixedLengthInstruct
 	}
 	
 	@Override
-	public void writeFixedSizeBytes(byte[] bytes, int addressToWriteAt, AssignedAddresses assignedAddresses) 
+	public void writeFixedSizeBytes(SegmentedWriter writer, BankAddress instructionAddress, AssignedAddresses assignedAddresses) throws IOException 
 	{
 		BankAddress address = assignedAddresses.getThrow(addressLabel);
 		if (!address.isFullAddress())
@@ -32,8 +35,8 @@ public class BlockBankLoadedAddress extends FixedLengthInstruct
 		
 		if (includeBank)
 		{
-			bytes[addressToWriteAt++] = address.getBank();
+			writer.append(address.getBank());
 		}
-		ByteUtils.writeAsShort(RomUtils.convertFromBankOffsetToLoadedOffset(address), bytes, addressToWriteAt);
+		writer.append(ByteUtils.shortToLittleEndianBytes(RomUtils.convertFromBankOffsetToLoadedOffset(address)));
 	}
 }

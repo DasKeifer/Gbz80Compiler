@@ -1,6 +1,9 @@
 package compiler;
 
 
+import java.io.IOException;
+
+import gbc_framework.SegmentedWriter;
 import gbc_framework.rom_addressing.AssignedAddresses;
 import gbc_framework.rom_addressing.BankAddress;
 
@@ -25,11 +28,11 @@ public abstract class FixedLengthInstruct implements Instruction
 	}
 	
 	@Override
-	public int writeBytes(byte[] bytes, int indexToAddAt, AssignedAddresses assignedAddresses)
+	public int writeBytes(SegmentedWriter writer, BankAddress instructionAddress, AssignedAddresses assignedAddresses) throws IOException
 	{
-		writeFixedSizeBytes(bytes, indexToAddAt, assignedAddresses);
+		writeFixedSizeBytes(writer, instructionAddress, assignedAddresses);
 		return size;
 	}
 
-	public abstract void writeFixedSizeBytes(byte[] bytes, int indexToAddAt, AssignedAddresses assignedAddresses);
+	public abstract void writeFixedSizeBytes(SegmentedWriter writer, BankAddress instructionAddress, AssignedAddresses assignedAddresses) throws IOException;
 }

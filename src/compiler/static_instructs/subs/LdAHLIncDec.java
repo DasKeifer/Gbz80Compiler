@@ -1,5 +1,8 @@
 package compiler.static_instructs.subs;
 
+import java.io.IOException;
+
+import gbc_framework.SegmentedWriter;
 import compiler.static_instructs.Ld;
 
 public class LdAHLIncDec extends Ld
@@ -15,7 +18,7 @@ public class LdAHLIncDec extends Ld
 	}
 	
 	@Override
-	public void writeStaticBytes(byte[] bytes, int indexToWriteAt) 
+	public void writeStaticBytes(SegmentedWriter writer) throws IOException
 	{
 		byte val = 0x2;
 		if (loadToA)
@@ -31,6 +34,6 @@ public class LdAHLIncDec extends Ld
 			val |= 0x30; // 3 << 4
 		}
 		
-		bytes[indexToWriteAt] = val;
+		writer.append(val);
 	}
 }

@@ -1,7 +1,9 @@
 package compiler.static_instructs;
 
+import java.io.IOException;
 import java.util.Arrays;
 
+import gbc_framework.SegmentedWriter;
 import compiler.CompilerUtils;
 import compiler.StaticInstruction;
 import compiler.CompilerConstants.InstructionConditions;
@@ -51,8 +53,9 @@ public class Nop extends StaticInstruction
 
 		throw new IllegalArgumentException(SUPPORT_STRING + Arrays.toString(args));
 	}
-	
-	public void writeStaticBytes(byte[] bytes, int indexToWriteAt)
+
+	@Override
+	public void writeStaticBytes(SegmentedWriter writer) throws IOException
 	{
 		int size = getSize();
 		int offset = 0;
@@ -61,14 +64,14 @@ public class Nop extends StaticInstruction
 		if (size > 3)
 		{
 			// -2 because its relative to the end of the JR command
-			JumpCallCommon.writeJr(bytes, indexToWriteAt, InstructionConditions.NONE, (byte) (size - 2));
+			JumpCallCommon.writeJr(writer, InstructionConditions.NONE, (byte) (size - 2));
 			offset = 2; // Start writing nops after the jump
 		}
 		
 		// Write the Nops for the rest of the size for safety
 		for (/*already set*/; offset < size; offset++)
 		{
-			bytes[indexToWriteAt + offset] = NOP_VALUE;
+			writer.append(NOP_VALUE);
 		}
 	}
 }

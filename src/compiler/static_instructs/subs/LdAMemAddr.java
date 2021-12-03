@@ -1,5 +1,8 @@
 package compiler.static_instructs.subs;
 
+import java.io.IOException;
+
+import gbc_framework.SegmentedWriter;
 import compiler.static_instructs.Ld;
 import gbc_framework.utils.ByteUtils;
 
@@ -15,20 +18,20 @@ public class LdAMemAddr extends Ld
 		this.addr = addr;
 		this.loadToA = loadToA;
 	}
-	
+
 	@Override
-	public void writeStaticBytes(byte[] bytes, int indexToWriteAt) 
+	public void writeStaticBytes(SegmentedWriter writer) throws IOException
 	{
 		// A, val
 		if (loadToA)
 		{
-			bytes[indexToWriteAt++] = (byte) 0xFA;
+			writer.append((byte) 0xFA);
 		}
 		// val, A
 		else
 		{
-			bytes[indexToWriteAt++] = (byte) 0xEA;
+			writer.append((byte) 0xEA);
 		}
-		ByteUtils.writeAsShort(addr, bytes, indexToWriteAt);
+		writer.append(ByteUtils.shortToLittleEndianBytes(addr));
 	}
 }

@@ -1,9 +1,11 @@
 package compiler;
 
+import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import gbc_framework.SegmentedWriter;
 import compiler.reference_instructs.PlaceholderInstruction;
 import gbc_framework.RomConstants;
 import gbc_framework.rom_addressing.AssignedAddresses;
@@ -62,14 +64,14 @@ public class Segment
 		}
 	}
 	
-	public int writeBytes(byte[] bytes, int assignedAddress, AssignedAddresses assignedAddresses)
+	public int writeBytes(SegmentedWriter writer, BankAddress segmentStartAddress, AssignedAddresses assignedAddresses) throws IOException
 	{
-		int writeAddress = assignedAddress;
+		BankAddress instructAddress = new BankAddress(segmentStartAddress);
 		for (Instruction item : data)
 		{
-			writeAddress += item.writeBytes(bytes, writeAddress, assignedAddresses);
+			segmentStartAddress.offset(item.writeBytes(writer, instructAddress, assignedAddresses));
 		}
 		
-		return writeAddress - assignedAddress;
+		return segmentStartAddress.getDifference(instructAddress);
 	}
 }

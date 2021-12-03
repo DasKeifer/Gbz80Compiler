@@ -1,8 +1,10 @@
 package compiler.reference_instructs;
 
 
+import java.io.IOException;
 import java.util.Arrays;
 
+import gbc_framework.SegmentedWriter;
 import compiler.CompilerUtils;
 import compiler.CompilerConstants.InstructionConditions;
 import gbc_framework.rom_addressing.AssignedAddresses;
@@ -120,9 +122,8 @@ public class Jump extends JumpCallCommon
 	}
 
 	@Override
-	public int writeBytes(byte[] bytes, int addressToWriteAt, AssignedAddresses assignedAddresses) 
-	{		
-		BankAddress bankAddressToWriteAt = new BankAddress(addressToWriteAt);
+	public int writeBytes(SegmentedWriter writer, BankAddress instructionAddress, AssignedAddresses assignedAddresses) throws IOException
+	{
 		BankAddress addressToGoTo = getAddressToGoTo(assignedAddresses, null);
 		if (!addressToGoTo.isFullAddress())
 		{
@@ -134,14 +135,14 @@ public class Jump extends JumpCallCommon
 		}
 		
 		// See if we want to JR
-		if (canJr(bankAddressToWriteAt, addressToGoTo))
+		if (canJr(instructionAddress, addressToGoTo))
 		{
-			return writeJr(bytes, addressToWriteAt, (byte) getJrValue(bankAddressToWriteAt, addressToGoTo));
+			return writeJr(writer, instructionAddress, (byte) getJrValue(instructionAddress, addressToGoTo));
 		}
 		// Otherwise its a normal jump or farjump
 		else
 		{
-			return super.writeBytes(bytes, addressToWriteAt, assignedAddresses);
+			return super.writeBytes(writer, instructionAddress, assignedAddresses);
 		}
 	}
 }

@@ -1,5 +1,8 @@
 package compiler.static_instructs.subs;
 
+import java.io.IOException;
+
+import gbc_framework.SegmentedWriter;
 import compiler.CompilerConstants.Register;
 import compiler.static_instructs.Sub;
 
@@ -13,9 +16,10 @@ public class SubReg extends Sub
 		super(SIZE);
 		this.reg = reg;
 	}
-	
-	public void writeStaticBytes(byte[] bytes, int indexToWriteAt)
+
+	@Override
+	public void writeStaticBytes(SegmentedWriter writer) throws IOException
 	{
-		bytes[indexToWriteAt] = (byte) (0x90 | reg.getValue());
+		writer.append((byte) (0x90 | reg.getValue()));
 	}
 }

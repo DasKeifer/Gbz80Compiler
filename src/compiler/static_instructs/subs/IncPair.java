@@ -1,5 +1,8 @@
 package compiler.static_instructs.subs;
 
+import java.io.IOException;
+
+import gbc_framework.SegmentedWriter;
 import compiler.CompilerConstants.RegisterPair;
 import compiler.static_instructs.Inc;
 
@@ -12,9 +15,10 @@ public class IncPair extends Inc
 		super();
 		this.pair = pair;
 	}
-	
-	public void writeStaticBytes(byte[] bytes, int indexToWriteAt)
+
+	@Override
+	public void writeStaticBytes(SegmentedWriter writer) throws IOException
 	{
-		bytes[indexToWriteAt] = (byte) (0x03 | pair.getValue() << 4);
+		writer.append((byte) (0x03 | pair.getValue() << 4));
 	}
 }

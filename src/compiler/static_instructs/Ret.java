@@ -1,7 +1,9 @@
 package compiler.static_instructs;
 
+import java.io.IOException;
 import java.util.Arrays;
 
+import gbc_framework.SegmentedWriter;
 import compiler.CompilerUtils;
 import compiler.StaticInstruction;
 import compiler.CompilerConstants.InstructionConditions;
@@ -51,16 +53,17 @@ public class Ret extends StaticInstruction
 
 		throw new IllegalArgumentException(SUPPORT_STRING + Arrays.toString(args));
 	}
-	
-	public void writeStaticBytes(byte[] bytes, int indexToWriteAt)
+
+	@Override
+	public void writeStaticBytes(SegmentedWriter writer) throws IOException
 	{
 		if (InstructionConditions.NONE == conditions)
 		{
-			bytes[indexToWriteAt] = (byte) 0xC9;
+			writer.append((byte) 0xC9);
 		}
 		else
 		{
-			bytes[indexToWriteAt] = (byte) (0xC0 | (conditions.getValue() << 3));
+			writer.append((byte) (0xC0 | (conditions.getValue() << 3)));
 		}
 	}
 }

@@ -1,7 +1,9 @@
 package compiler.static_instructs;
 
+import java.io.IOException;
 import java.util.Arrays;
 
+import gbc_framework.SegmentedWriter;
 import compiler.CompilerUtils;
 import compiler.StaticInstruction;
 import compiler.CompilerConstants.RegisterPair;
@@ -46,11 +48,13 @@ public class Lb extends StaticInstruction
 		throw new IllegalArgumentException(SUPPORT_STRING + Arrays.toString(args));
 	}
 	
-	@Override
-	public void writeStaticBytes(byte[] bytes, int indexToWriteAt)
+	//@Override
+	public void writeStaticBytes(SegmentedWriter writer) throws IOException
 	{
-		bytes[indexToWriteAt++] = (byte) (0x01 | (pair.getValue() << 4));
-		bytes[indexToWriteAt++] = value2;
-		bytes[indexToWriteAt] = value1;
+		writer.append(
+				(byte) (0x01 | (pair.getValue() << 4)), 
+				value2,
+				value1
+		);
 	}
 }

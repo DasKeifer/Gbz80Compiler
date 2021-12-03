@@ -1,7 +1,9 @@
 package compiler.static_instructs;
 
+import java.io.IOException;
 import java.util.Arrays;
 
+import gbc_framework.SegmentedWriter;
 import compiler.CompilerUtils;
 import compiler.StaticInstruction;
 import gbc_framework.utils.ByteUtils;
@@ -40,10 +42,11 @@ public class BankCall1 extends StaticInstruction
 		throw new IllegalArgumentException(SUPPORT_STRING + Arrays.toString(args));
 	}
 	
-	public void writeStaticBytes(byte[] bytes, int indexToWriteAt)
+	@Override
+	public void writeStaticBytes(SegmentedWriter writer) throws IOException
 	{
 		// bankcall1 is in RST 18
-		bytes[indexToWriteAt++] = (byte) (0xC7 | 0x18); 
-		ByteUtils.writeAsShort(value, bytes, indexToWriteAt);
+		writer.append((byte) (0xC7 | 0x18));
+		writer.append(ByteUtils.shortToLittleEndianBytes(value));
 	}
 }

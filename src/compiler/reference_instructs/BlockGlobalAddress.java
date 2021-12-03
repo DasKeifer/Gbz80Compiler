@@ -1,6 +1,9 @@
 package compiler.reference_instructs;
 
 
+import java.io.IOException;
+
+import gbc_framework.SegmentedWriter;
 import compiler.FixedLengthInstruct;
 import gbc_framework.rom_addressing.AssignedAddresses;
 import gbc_framework.rom_addressing.BankAddress;
@@ -25,9 +28,9 @@ public class BlockGlobalAddress extends FixedLengthInstruct
 	{
 		return SIZE;
 	}
-	
+
 	@Override
-	public void writeFixedSizeBytes(byte[] bytes, int addressToWriteAt, AssignedAddresses assignedAddresses) 
+	public void writeFixedSizeBytes(SegmentedWriter writer, BankAddress instructionAddress, AssignedAddresses assignedAddresses) throws IOException 
 	{
 		BankAddress address = assignedAddresses.getTry(addressLabel);
 		if (!address.isFullAddress())
@@ -35,6 +38,6 @@ public class BlockGlobalAddress extends FixedLengthInstruct
 			throw new IllegalAccessError("BlockGlobalAddress tried to write address for " + addressLabel + " but it is not fully assigned: " + address.toString());
 		}
 		
-		ByteUtils.writeLittleEndian(RomUtils.convertToGlobalAddress(address) - (long) offset, bytes, addressToWriteAt, SIZE);
+		writer.append(ByteUtils.toLittleEndianBytes(RomUtils.convertToGlobalAddress(address) - (long) offset, SIZE));
 	}
 }

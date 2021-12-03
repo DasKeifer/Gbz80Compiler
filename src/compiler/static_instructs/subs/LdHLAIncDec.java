@@ -1,5 +1,8 @@
 package compiler.static_instructs.subs;
 
+import java.io.IOException;
+
+import gbc_framework.SegmentedWriter;
 import compiler.CompilerConstants.Register;
 import compiler.static_instructs.Ld;
 
@@ -15,17 +18,18 @@ public class LdHLAIncDec extends Ld
 		this.reg = reg;
 		this.increment = incrementNotDec;
 	}
-	
-	public void writeStaticBytes(byte[] bytes, int indexToWriteAt)
+
+	@Override
+	public void writeStaticBytes(SegmentedWriter writer) throws IOException
 	{
 		byte val = 0x2;
 		if (increment)
 		{
-			bytes[indexToWriteAt] = (byte) (val | 0x20); // 2 << 4
+			writer.append((byte) (val | 0x20)); // 2 << 4
 		}
 		else
 		{
-			bytes[indexToWriteAt] = (byte) (val | 0x30); // 3 << 4
+			writer.append((byte) (val | 0x30)); // 3 << 4
 		}
 	}
 }

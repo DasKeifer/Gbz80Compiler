@@ -1,11 +1,12 @@
 package compiler.static_instructs;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
+import gbc_framework.SegmentedWriter;
 import compiler.StaticInstruction;
-import gbc_framework.utils.ByteUtils;
 
 public class RawBytes extends StaticInstruction
 {
@@ -37,13 +38,11 @@ public class RawBytes extends StaticInstruction
 	}
 
 	@Override
-	public void writeStaticBytes(byte[] bytes, int indexToWriteAt) 
+	public void writeStaticBytes(SegmentedWriter writer) throws IOException
 	{
 		for (byte[] set : allBytes)
 		{
-			ByteUtils.copyBytes(bytes, indexToWriteAt, set);
-			indexToWriteAt += set.length;
+			writer.append(set);
 		}
-		
 	}
 }

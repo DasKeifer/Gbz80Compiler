@@ -1,5 +1,6 @@
 package compiler;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -8,7 +9,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import gbc_framework.SegmentedWriter;
 import compiler.reference_instructs.PlaceholderInstruction;
+import compiler.static_instructs.Nop;
 
 import java.util.Set;
 
@@ -195,17 +198,32 @@ public class CodeBlock implements ByteBlock
 		}
 		segments = refreshedSegments;
 	}
-
-	public void writeBytes(byte[] bytes, AssignedAddresses assignedAddresses)
+	
+	private void checkAndFillSegmentGaps(
+			BankAddress expectedFromPrevSegAddress,
+			BankAddress nextSegAddress, 
+			SegmentedWriter writer,
+			AssignedAddresses assignedAddresses,
+			String nextSegName
+	) throws IOException
 	{
-		// Don't need to write anything for the end of the segment
-		for (Entry<String, Segment> segEntry : segments.entrySet())
-		{
-			BankAddress segAddress = assignedAddresses.getThrow(segEntry.getKey());
-			segEntry.getValue().writeBytes(bytes, RomUtils.convertToGlobalAddress(segAddress), assignedAddresses);
-		}
+		int diff = expectedFromPrevSegAddress.getDifference(nextSegAddress);
 		
-		// End reference has no code so no writing needs to be done
+		// If the next address is higher than the expected (previous + size),
+		// then fill with nops
+		if (diff > 0)
+		{
+			new Nop(diff).writeBytes(writer, expectedFromPrevSegAddress, assignedAddresses);
+		}
+		// If its lower than the expected, then we would overwrite the data so throw
+		else if (diff < 0)
+		{
+			throw new IllegalArgumentException("Encountered error while writing - the next segment address (" + 
+					nextSegAddress.toString() + ") is less than the expected next address (" + 
+					expectedFromPrevSegAddress.toString() + 
+					") meaning some bytes would be overwritten when writing segment ID " + nextSegName + " of block " + id);
+		}
+		// else do nothing - we are good
 	}
 
 	@Override
@@ -493,5 +511,27 @@ public class CodeBlock implements ByteBlock
 				nextSegRelAddress = nextSegRelAddress.newOffsetted(segSize);
 			}
 		}
+	}
+
+	@Override
+	public void write(SegmentedWriter writer, AssignedAddresses assignedAddresses) throws IOException
+	{
+		// Set the expected address to the address of this block
+		BankAddress expectedFromPrevSegAddress = new BankAddress(assignedAddresses.getThrow(id));
+		
+		// Trigger a new write segment in the writer. All block segments will be written in 
+		// the same write segment
+		writer.newSegment(RomUtils.convertToGlobalAddress(expectedFromPrevSegAddress));
+		
+		// End segment is handled separately below since we don't need to write for it
+		for (Entry<String, Segment> segEntry : segments.entrySet())
+		{
+			BankAddress segAddress = assignedAddresses.getThrow(segEntry.getKey());
+			checkAndFillSegmentGaps(expectedFromPrevSegAddress, segAddress, writer, assignedAddresses, segEntry.getKey());
+			expectedFromPrevSegAddress.offset(segEntry.getValue().writeBytes(writer, segAddress, assignedAddresses));
+		}
+		
+		// End reference has no code but still need to check its where we expect
+		checkAndFillSegmentGaps(expectedFromPrevSegAddress, assignedAddresses.getThrow(getEndSegmentId()), writer, assignedAddresses, getEndSegmentId());
 	}
 }

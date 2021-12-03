@@ -3,8 +3,10 @@ package compiler.static_instructs;
 import compiler.CompilerUtils;
 import compiler.StaticInstruction;
 
+import java.io.IOException;
 import java.util.Arrays;
 
+import gbc_framework.SegmentedWriter;
 import compiler.CompilerConstants.Register;
 
 public class Ldh extends StaticInstruction
@@ -74,19 +76,20 @@ public class Ldh extends StaticInstruction
 		
 		throw new IllegalArgumentException(SUPPORT_STRING + Arrays.toString(args));
 	}
-	
-	public void writeStaticBytes(byte[] bytes, int indexToWriteAt)
+
+	@Override
+	public void writeStaticBytes(SegmentedWriter writer) throws IOException
 	{
 		// A, val
 		if (isAFirst)
 		{
-			bytes[indexToWriteAt++] = (byte) 0xF0;
+			writer.append((byte) 0xF0);
 		}
 		// val, A
 		else
 		{
-			bytes[indexToWriteAt++] = (byte) 0xE0;
+			writer.append((byte) 0xE0);
 		}
-		bytes[indexToWriteAt] = value;
+		writer.append(value);
 	}
 }

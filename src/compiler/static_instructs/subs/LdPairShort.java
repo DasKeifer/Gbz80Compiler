@@ -1,5 +1,8 @@
 package compiler.static_instructs.subs;
 
+import java.io.IOException;
+
+import gbc_framework.SegmentedWriter;
 import compiler.CompilerConstants.RegisterPair;
 import compiler.static_instructs.Ld;
 import gbc_framework.utils.ByteUtils;
@@ -15,12 +18,11 @@ public class LdPairShort extends Ld
 		this.pair = pair;
 		this.value = value;
 	}
-	
+
 	@Override
-	public void writeStaticBytes(byte[] bytes, int indexToWriteAt)
+	public void writeStaticBytes(SegmentedWriter writer) throws IOException
 	{
-		bytes[indexToWriteAt++] = (byte) (0x01 | (pair.getValue() << 4));
-		
-		ByteUtils.writeAsShort(value, bytes, indexToWriteAt);
+		writer.append((byte) (0x01 | (pair.getValue() << 4)));
+		writer.append(ByteUtils.shortToLittleEndianBytes(value));
 	}
 }
