@@ -27,6 +27,12 @@ public class RawBytes extends StaticInstruction
 		Collections.addAll(allBytes, bytes);
 	}
 	
+	public RawBytes(List<byte[]> bytes) 
+	{
+		super(bytes.size());
+		allBytes = new LinkedList<>(bytes);
+	}
+	
 	private static int determineSize(byte[]... bytes)
 	{
 		int size = 0;
