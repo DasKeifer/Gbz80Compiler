@@ -3,7 +3,7 @@ package compiler.static_instructs;
 import java.io.IOException;
 import java.util.Arrays;
 
-import gbc_framework.SegmentedWriter;
+import gbc_framework.QueuedWriter;
 import compiler.CompilerUtils;
 import compiler.StaticInstruction;
 import compiler.CompilerConstants.InstructionConditions;
@@ -54,8 +54,9 @@ public class Nop extends StaticInstruction
 		throw new IllegalArgumentException(SUPPORT_STRING + Arrays.toString(args));
 	}
 
+	// TODO: Have option to jump instead of write all nops
 	@Override
-	public void writeStaticBytes(SegmentedWriter writer) throws IOException
+	public void writeStaticBytes(QueuedWriter writer) throws IOException
 	{
 		int size = getSize();
 		int offset = 0;

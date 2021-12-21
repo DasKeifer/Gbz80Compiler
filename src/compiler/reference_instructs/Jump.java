@@ -4,7 +4,7 @@ package compiler.reference_instructs;
 import java.io.IOException;
 import java.util.Arrays;
 
-import gbc_framework.SegmentedWriter;
+import gbc_framework.QueuedWriter;
 import compiler.CompilerUtils;
 import compiler.CompilerConstants.InstructionConditions;
 import gbc_framework.rom_addressing.AssignedAddresses;
@@ -122,7 +122,7 @@ public class Jump extends JumpCallCommon
 	}
 
 	@Override
-	public int writeBytes(SegmentedWriter writer, BankAddress instructionAddress, AssignedAddresses assignedAddresses) throws IOException
+	public int writeBytes(QueuedWriter writer, BankAddress instructionAddress, AssignedAddresses assignedAddresses) throws IOException
 	{
 		BankAddress addressToGoTo = getAddressToGoTo(assignedAddresses, null);
 		if (!addressToGoTo.isFullAddress())

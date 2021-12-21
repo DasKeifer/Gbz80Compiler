@@ -3,7 +3,7 @@ package compiler.static_instructs;
 import java.io.IOException;
 import java.util.Arrays;
 
-import gbc_framework.SegmentedWriter;
+import gbc_framework.QueuedWriter;
 import compiler.CompilerUtils;
 import compiler.StaticInstruction;
 import gbc_framework.utils.ByteUtils;
@@ -43,7 +43,7 @@ public class BankCall1 extends StaticInstruction
 	}
 	
 	@Override
-	public void writeStaticBytes(SegmentedWriter writer) throws IOException
+	public void writeStaticBytes(QueuedWriter writer) throws IOException
 	{
 		// bankcall1 is in RST 18
 		writer.append((byte) (0xC7 | 0x18));

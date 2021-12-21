@@ -3,7 +3,7 @@ package compiler.reference_instructs;
 
 import java.io.IOException;
 
-import gbc_framework.SegmentedWriter;
+import gbc_framework.QueuedWriter;
 import compiler.FixedLengthInstruct;
 import gbc_framework.rom_addressing.AssignedAddresses;
 import gbc_framework.rom_addressing.BankAddress;
@@ -30,7 +30,7 @@ public class BlockGlobalAddress extends FixedLengthInstruct
 	}
 
 	@Override
-	public void writeFixedSizeBytes(SegmentedWriter writer, BankAddress instructionAddress, AssignedAddresses assignedAddresses) throws IOException 
+	public void writeFixedSizeBytes(QueuedWriter writer, BankAddress instructionAddress, AssignedAddresses assignedAddresses) throws IOException 
 	{
 		BankAddress address = assignedAddresses.getTry(addressLabel);
 		if (!address.isFullAddress())

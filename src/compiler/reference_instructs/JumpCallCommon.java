@@ -8,7 +8,7 @@ import gbc_framework.rom_addressing.BankAddress;
 import java.io.IOException;
 import java.util.Arrays;
 
-import gbc_framework.SegmentedWriter;
+import gbc_framework.QueuedWriter;
 import compiler.CompilerUtils;
 import compiler.Instruction;
 import gbc_framework.utils.ByteUtils;
@@ -142,20 +142,7 @@ public abstract class JumpCallCommon implements Instruction
 		BankAddress address = addressToGoTo;
 		if (address == BankAddress.UNASSIGNED)
 		{
-			// Try and get it from the temp indexes first
-			if (tempAssigns != null)
-			{
-				address = tempAssigns.getTry(labelToGoTo);
-			}
-			
-			if (address == BankAddress.UNASSIGNED)
-			{
-				address = assignedAddresses.getTry(labelToGoTo);
-				if (address == BankAddress.UNASSIGNED)
-				{
-					return BankAddress.UNASSIGNED;
-				}
-			}
+			address = Instruction.tryGetAddress(labelToGoTo, assignedAddresses, tempAssigns);
 		}
 		return address;
 	}
@@ -202,7 +189,7 @@ public abstract class JumpCallCommon implements Instruction
 	}
 	
 	@Override
-	public int writeBytes(SegmentedWriter writer, BankAddress instructionAddress, AssignedAddresses assignedAddresses) throws IOException 
+	public int writeBytes(QueuedWriter writer, BankAddress instructionAddress, AssignedAddresses assignedAddresses) throws IOException 
 	{	
 		BankAddress toGoToAddress = getAddressToGoTo(assignedAddresses, null);
 		if (!toGoToAddress.isFullAddress())
@@ -233,7 +220,7 @@ public abstract class JumpCallCommon implements Instruction
 		}
 	}
 	
-	protected int writeJpCall(SegmentedWriter writer, BankAddress instructionAddress, BankAddress addressToGoTo) throws IOException 
+	protected int writeJpCall(QueuedWriter writer, BankAddress instructionAddress, BankAddress addressToGoTo) throws IOException 
 	{		
 		// always call
 		if (InstructionConditions.NONE == conditions)
@@ -251,7 +238,7 @@ public abstract class JumpCallCommon implements Instruction
 		return 3;
 	}
 
-	protected int writeFarJpCall(SegmentedWriter writer, BankAddress instructionAddress, BankAddress addressToGoTo) throws IOException 
+	protected int writeFarJpCall(QueuedWriter writer, BankAddress instructionAddress, BankAddress addressToGoTo) throws IOException 
 	{		
 		// This is an "RST" call (id 0xC7). These are special calls loaded into the ROM at the beginning. For
 		// this ROM, RST5 (id 0x28) jumps to the "FarCall" function in the home.asm which handles
@@ -264,13 +251,13 @@ public abstract class JumpCallCommon implements Instruction
 		return 4;
 	}
 	
-	protected int writeJr(SegmentedWriter writer, BankAddress instructionAddress, byte relAddress) throws IOException 
+	protected int writeJr(QueuedWriter writer, BankAddress instructionAddress, byte relAddress) throws IOException 
 	{
 		writeJr(writer, conditions, relAddress);
 		return 2;
 	}	
 	
-	public static void writeJr(SegmentedWriter writer, InstructionConditions conditions, byte relAddress) throws IOException 
+	public static void writeJr(QueuedWriter writer, InstructionConditions conditions, byte relAddress) throws IOException 
 	{
 		if (InstructionConditions.NONE == conditions)
 		{

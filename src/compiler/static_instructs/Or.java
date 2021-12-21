@@ -3,7 +3,7 @@ package compiler.static_instructs;
 import java.io.IOException;
 import java.util.Arrays;
 
-import gbc_framework.SegmentedWriter;
+import gbc_framework.QueuedWriter;
 import compiler.CompilerUtils;
 import compiler.StaticInstruction;
 import compiler.CompilerConstants.Register;
@@ -42,7 +42,7 @@ public class Or extends StaticInstruction
 	}
 
 	@Override
-	public void writeStaticBytes(SegmentedWriter writer) throws IOException
+	public void writeStaticBytes(QueuedWriter writer) throws IOException
 	{
 		writer.append((byte) (0xB0 | reg.getValue()));
 	}

@@ -13,9 +13,6 @@ public final class CompilerUtils
 {
 	private CompilerUtils() {}
 	
-	public static final int UNASSIGNED_ADDRESS = -1;
-	public static final int UNASSIGNED_BANK = -1;
-	public static final int UNASSIGNED_LOCAL_ADDRESS = -2;
 	static final String SEGMENT_ENDLINE = ":";
 	static final String SUBSEGMENT_STARTLINE = ".";
 	static final String STRING_QUOTE = "\n";

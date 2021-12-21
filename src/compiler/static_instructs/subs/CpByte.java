@@ -2,7 +2,7 @@ package compiler.static_instructs.subs;
 
 import java.io.IOException;
 
-import gbc_framework.SegmentedWriter;
+import gbc_framework.QueuedWriter;
 import compiler.static_instructs.Cp;
 
 public class CpByte extends Cp
@@ -17,7 +17,7 @@ public class CpByte extends Cp
 	}
 
 	@Override
-	public void writeStaticBytes(SegmentedWriter writer) throws IOException
+	public void writeStaticBytes(QueuedWriter writer) throws IOException
 	{
 		writer.append((byte) 0xFE);
 		writer.append(value);

@@ -2,7 +2,7 @@ package compiler.static_instructs.subs;
 
 import java.io.IOException;
 
-import gbc_framework.SegmentedWriter;
+import gbc_framework.QueuedWriter;
 import compiler.CompilerConstants.RegisterPair;
 import compiler.static_instructs.Inc;
 
@@ -17,7 +17,7 @@ public class IncPair extends Inc
 	}
 
 	@Override
-	public void writeStaticBytes(SegmentedWriter writer) throws IOException
+	public void writeStaticBytes(QueuedWriter writer) throws IOException
 	{
 		writer.append((byte) (0x03 | pair.getValue() << 4));
 	}

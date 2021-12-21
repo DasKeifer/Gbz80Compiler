@@ -2,7 +2,7 @@ package compiler.static_instructs.subs;
 
 import java.io.IOException;
 
-import gbc_framework.SegmentedWriter;
+import gbc_framework.QueuedWriter;
 import compiler.static_instructs.Ld;
 import gbc_framework.utils.ByteUtils;
 
@@ -20,7 +20,7 @@ public class LdAMemAddr extends Ld
 	}
 
 	@Override
-	public void writeStaticBytes(SegmentedWriter writer) throws IOException
+	public void writeStaticBytes(QueuedWriter writer) throws IOException
 	{
 		// A, val
 		if (loadToA)

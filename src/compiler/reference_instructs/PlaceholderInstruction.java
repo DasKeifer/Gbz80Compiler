@@ -4,7 +4,7 @@ package compiler.reference_instructs;
 import java.io.IOException;
 import java.util.Map;
 
-import gbc_framework.SegmentedWriter;
+import gbc_framework.QueuedWriter;
 import compiler.CompilerUtils;
 import compiler.Instruction;
 import compiler.InstructionParser;
@@ -50,7 +50,7 @@ public class PlaceholderInstruction implements Instruction
 	}
 
 	@Override
-	public int writeBytes(SegmentedWriter writer, BankAddress instructionAddress, AssignedAddresses assignedAddresses) throws IOException 
+	public int writeBytes(QueuedWriter writer, BankAddress instructionAddress, AssignedAddresses assignedAddresses) throws IOException 
 	{
 		if (inst == null)
 		{

@@ -6,7 +6,7 @@ import compiler.StaticInstruction;
 import java.io.IOException;
 import java.util.Arrays;
 
-import gbc_framework.SegmentedWriter;
+import gbc_framework.QueuedWriter;
 import compiler.CompilerConstants.Register;
 
 public class Ldh extends StaticInstruction
@@ -78,7 +78,7 @@ public class Ldh extends StaticInstruction
 	}
 
 	@Override
-	public void writeStaticBytes(SegmentedWriter writer) throws IOException
+	public void writeStaticBytes(QueuedWriter writer) throws IOException
 	{
 		// A, val
 		if (isAFirst)

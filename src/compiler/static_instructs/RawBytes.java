@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
-import gbc_framework.SegmentedWriter;
+import gbc_framework.QueuedWriter;
 import compiler.StaticInstruction;
 
 public class RawBytes extends StaticInstruction
@@ -29,7 +29,7 @@ public class RawBytes extends StaticInstruction
 	
 	public RawBytes(List<byte[]> bytes) 
 	{
-		super(bytes.size());
+		super(determineSize(bytes));
 		allBytes = new LinkedList<>(bytes);
 	}
 	
@@ -41,10 +41,21 @@ public class RawBytes extends StaticInstruction
 			size += set.length;
 		}
 		return size;
+	}	
+	
+	// TODO: Consolidate with above?
+	private static int determineSize(List<byte[]> bytes)
+	{
+		int size = 0;
+		for (byte[] set : bytes)
+		{
+			size += set.length;
+		}
+		return size;
 	}
 
 	@Override
-	public void writeStaticBytes(SegmentedWriter writer) throws IOException
+	public void writeStaticBytes(QueuedWriter writer) throws IOException
 	{
 		for (byte[] set : allBytes)
 		{

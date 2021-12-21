@@ -2,7 +2,7 @@ package compiler.static_instructs.subs;
 
 import java.io.IOException;
 
-import gbc_framework.SegmentedWriter;
+import gbc_framework.QueuedWriter;
 import compiler.static_instructs.Sub;
 
 public class SubByte extends Sub
@@ -17,7 +17,7 @@ public class SubByte extends Sub
 	}
 
 	@Override
-	public void writeStaticBytes(SegmentedWriter writer) throws IOException
+	public void writeStaticBytes(QueuedWriter writer) throws IOException
 	{
 		writer.append(
 				(byte) 0xD6, 

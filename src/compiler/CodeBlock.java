@@ -9,28 +9,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import gbc_framework.SegmentedWriter;
+import gbc_framework.QueuedWriter;
 import compiler.reference_instructs.PlaceholderInstruction;
 import compiler.static_instructs.Nop;
 
 import java.util.Set;
 
-import gbc_framework.ByteBlock;
+import gbc_framework.SegmentedByteBlock;
 import gbc_framework.RomConstants;
 import gbc_framework.rom_addressing.AssignedAddresses;
 import gbc_framework.rom_addressing.BankAddress;
 import gbc_framework.utils.RomUtils;
 
-public class CodeBlock implements ByteBlock
+public class CodeBlock implements SegmentedByteBlock
 {	
-	public static final String END_OF_DATA_BLOCK_SUBSEG_LABEL = "__end_of_data_block__";
 	LinkedHashMap<String, Segment> segments; // linked to keep order
 	private String id;
 
 	private String rootSegmentName;
 	private Segment currSegment;
-	private String endSegmentName; // Root name + "." + END_OF_DATA_BLOCK_SUBSEG_LABEL
-	private Segment endSegment; // and empty segment so we can refer to with "." + END_OF_BLOCK_LABEL for any datablock
 	
 	private static InstructionParser instructParserSingleton = new InstructionParser();
 	
@@ -65,8 +62,6 @@ public class CodeBlock implements ByteBlock
 	{
 		segments = new LinkedHashMap<>();
 		this.id = id;
-		endSegmentName = CompilerUtils.formSubsegmentName(END_OF_DATA_BLOCK_SUBSEG_LABEL, id);
-		endSegment = new Segment();
 		newSegment(id);
 	}
 	
@@ -143,39 +138,20 @@ public class CodeBlock implements ByteBlock
 		currSegment.appendInstruction(instruct);
 	}
 	
-	public String getEndSegmentId()
-	{
-		return endSegmentName;
-	}
-
+	@Override
 	public Set<String> getSegmentIds() 
 	{
-		return getSegmentIds(true);
+		return getOrderedSegmentIds();
+	}
+
+	public Set<String> getOrderedSegmentIds() 
+	{
+		return new LinkedHashSet<>(segments.keySet());
 	}
 	
-	public Set<String> getSegmentIds(boolean includeEndOfSegRef) 
+	public Map<String, Segment> getOrderedSegmentsById()
 	{
-		LinkedHashSet<String> segIds = new LinkedHashSet<>(segments.keySet());
-		if (includeEndOfSegRef)
-		{
-			segIds.add(CompilerUtils.formSubsegmentName(END_OF_DATA_BLOCK_SUBSEG_LABEL, id));
-		}
-		return segIds;
-	}
-	
-	public Map<String, Segment> getSegmentsById()
-	{
-		return getSegmentsById(true);
-	}
-	
-	public Map<String, Segment> getSegmentsById(boolean includeEndOfSegRef)
-	{
-		Map<String, Segment> segRefsById = new LinkedHashMap<>(segments);
-		if (includeEndOfSegRef)
-		{
-			segRefsById.put(endSegmentName, endSegment);
-		}
-		return segRefsById;
+		return new LinkedHashMap<>(segments);
 	}
 
 	public void replacePlaceholderIds(Map<String, String> placeholderToArgsForIds)
@@ -199,33 +175,6 @@ public class CodeBlock implements ByteBlock
 		segments = refreshedSegments;
 	}
 	
-	private void checkAndFillSegmentGaps(
-			BankAddress expectedFromPrevSegAddress,
-			BankAddress nextSegAddress, 
-			SegmentedWriter writer,
-			AssignedAddresses assignedAddresses,
-			String nextSegName
-	) throws IOException
-	{
-		int diff = expectedFromPrevSegAddress.getDifference(nextSegAddress);
-		
-		// If the next address is higher than the expected (previous + size),
-		// then fill with nops
-		if (diff > 0)
-		{
-			new Nop(diff).writeBytes(writer, expectedFromPrevSegAddress, assignedAddresses);
-		}
-		// If its lower than the expected, then we would overwrite the data so throw
-		else if (diff < 0)
-		{
-			throw new IllegalArgumentException("Encountered error while writing - the next segment address (" + 
-					nextSegAddress.toString() + ") is less than the expected next address (" + 
-					expectedFromPrevSegAddress.toString() + 
-					") meaning some bytes would be overwritten when writing segment ID " + nextSegName + " of block " + id);
-		}
-		// else do nothing - we are good
-	}
-
 	@Override
 	public String getId()
 	{
@@ -234,30 +183,20 @@ public class CodeBlock implements ByteBlock
 
 	@Override
 	public int getWorstCaseSize(AssignedAddresses assignedAddresses)
-	{
-		BankAddress blockAddress = assignedAddresses.getTry(getId());
-		return getSizeAndSegmentsRelativeAddresses(blockAddress, assignedAddresses, null, false); // null = don't care about the relative address of segments, false = do not include end segment
-	}
-
-	@Override
-	public boolean addAllIds(Set<String> usedIds)
-	{	
-		// Add the references for its segments
-		for (String segmentId : getSegmentsById().keySet())
+	{        
+		BankAddress blockAddress = BankAddress.UNASSIGNED;
+		if (assignedAddresses != null)
 		{
-			if (!usedIds.add(segmentId))
-			{
-				return false;
-			}
+			blockAddress = assignedAddresses.getTry(getId());
 		}
-		
-		return true;
+		return blockAddress.newAtStartOfBank().getDifference(
+				getSegmentsRelativeAddresses(blockAddress, assignedAddresses, null)); // null = don't care about the relative address of segments
 	}
 		
 	@Override
 	public void assignBank(byte bank, AssignedAddresses assignedAddresses)
 	{
-		for (String segId : getSegmentsById().keySet())
+		for (String segId : getOrderedSegmentsById().keySet())
 		{
 			assignedAddresses.putBankOnly(segId, bank);
 		}
@@ -266,73 +205,17 @@ public class CodeBlock implements ByteBlock
 	@Override
 	public void removeAddresses(AssignedAddresses assignedAddresses)
 	{
-		for (String segId : getSegmentsById().keySet())
+		for (String segId : getOrderedSegmentsById().keySet())
 		{
 			assignedAddresses.remove(segId);
 		}
 	}
 
 	@Override
-	public BankAddress assignAddresses(BankAddress blockAddress, AssignedAddresses assignedAddresses) 
-	{
-		// Will throw if the addresses are invalid - means we can make some assumptions here
-		AssignedAddresses relAddresses = getSegmentsRelativeAddresses(blockAddress, assignedAddresses);
-		
-		// For each segment relative address, offset it to the block address and add it to the
-		// allocated indexes	
-		// Note that these will be in the correct order and will have the end segment label
-		String segmentId;
-		Iterator<String> segItr = getSegmentIds().iterator();
-		BankAddress lastAddress = blockAddress;
-		while (segItr.hasNext())
-		{
-			segmentId = segItr.next();
-			BankAddress relAddress = relAddresses.getThrow(segmentId);
-			int addressInBank = relAddress.getAddressInBank() + blockAddress.getAddressInBank();
-			// Make sure we didn't pass the end of the bank
-			if (addressInBank > RomConstants.BANK_SIZE)
-			{
-				throw new RuntimeException("assignBlockAndSegmentBankAddresses Passed the end of a bank "
-						+ "while assigning addresses for segment (" + segmentId + "). Each data block "
-						+ "should fit assuming the blocks were successfully packed in earlier stages");
-			}
-			// If its the end of the bank, its ok if its the last segment or the next segment
-			// is the end of block placeholder segment
-			else if (addressInBank == RomConstants.BANK_SIZE)
-			{
-				if (!segItr.hasNext() || segItr.next().equals(getEndSegmentId()))
-				{
-					assignedAddresses.put(segmentId, (byte) (relAddress.getBank() + 1), (short) 0);
-				}
-				else
-				{
-					throw new RuntimeException("assignBlockAndSegmentBankAddresses Reached the end of a bank while "
-							+ "assigning addresses but there is still a segment (" + segmentId + ") to assign. Each "
-							+ "data block should fit assuming the blocks were successfully packed in earlier stages");
-				}
-			}
-			else
-			{
-				lastAddress = new BankAddress(blockAddress.getBank(), (short) addressInBank);
-				assignedAddresses.put(segmentId, lastAddress);
-			}
-		}
-		
-		return lastAddress;
-	}
-	
-	private AssignedAddresses getSegmentsRelativeAddresses(BankAddress blockAddress, AssignedAddresses assignedAddresses)
-	{
-		AssignedAddresses relAddresses = new AssignedAddresses();
-		getSizeAndSegmentsRelativeAddresses(blockAddress, assignedAddresses, relAddresses, true); // true = include end segment
-		return relAddresses;
-	}
-	
-	private int getSizeAndSegmentsRelativeAddresses(
-			BankAddress blockAddress, 
+	public BankAddress getSegmentsRelativeAddresses(
+			BankAddress blockAddress,
 			AssignedAddresses assignedAddresses, 
-			AssignedAddresses relAddresses,
-			boolean includeEndSeg
+			AssignedAddresses relAddresses
 	)
 	{
 		if (relAddresses == null)
@@ -350,188 +233,190 @@ public class CodeBlock implements ByteBlock
 		// Empty because segments doesn't include the end segment
 		if (segments.isEmpty())
 		{
-			return 0;
+			return BankAddress.ZERO;
 		}
 		
 		// Otherwise we need more complex logic
 		// Get the starting point of the addresses
-		Map<String, Segment> segmentsToUse = getSegmentsById(includeEndSeg);
-		getSegRelAddressesStartingPoint(segmentsToUse, blockAddress, assignedAddresses, relAddresses);
+		Map<String, Segment> orderedSegmentsToUse = getOrderedSegmentsById();
+		getSegRelAddressesStartingPoint(blockAddress, orderedSegmentsToUse, assignedAddresses, relAddresses);
 
 		// Now do more passes until we have a stable length for all the segments
 		boolean stable = false;
-		int size = 0;
+		BankAddress nextExpectedAddress = blockAddress.newAtStartOfBank();
 		while (!stable)
 		{
 			// Assume we are good until proven otherwise and reset the size
-			stable = true;
-			size = 0;
-			
-			BankAddress relAddress = blockAddress.newAtStartOfBank();
-			Iterator<Entry<String, Segment>> segIter = segmentsToUse.entrySet().iterator();
-			while (segIter.hasNext())
+			stable = true;			
+			nextExpectedAddress = blockAddress.newAtStartOfBank();
+			Iterator<Entry<String, Segment>> segItr = orderedSegmentsToUse.entrySet().iterator();
+			while (segItr.hasNext())
 			{
-				// Get the next entry and its address
-				Entry<String, Segment> segEntry = segIter.next();
-				BankAddress foundAddress = relAddresses.getThrow(segEntry.getKey());
-
-				// Now get where we found it to be
-				checkAndSetRelativeAddressToSize(segEntry.getKey(), size, relAddress);
+				Entry<String, Segment> segEntry = segItr.next();
 				
-				// The greater than case is handled by worst case size below - if it would be over length,
-				// it is caught there on the previous iteration
+				// Get the next entry and its address
+				BankAddress foundAddress = relAddresses.getThrow(segEntry.getKey());
 				
 				// If it expected address doesn't equal the assigned one, 
 				// we aren't stable yet and we need to update the stored address
-				if (!foundAddress.equals(relAddress))
+				if (!foundAddress.equals(nextExpectedAddress))
 				{
 					stable = false;
-					foundAddress.setToCopyOf(relAddress);
+					foundAddress.setToCopyOf(nextExpectedAddress);
 				}
-						
-				// Now determine the overall block size so far/where the next segments rel address would be
-				int segSize = segEntry.getValue().getWorstCaseSize(relAddress, assignedAddresses, relAddresses);
-				// If its less than 0, it didn't fit at the address meaning this block is too big
-				if (segSize < 0)
-				{
-					throw new RuntimeException("Failed to assign relative address in the bank for the datablock \"" +
-							getId() + "\"- Adding a segment (" + segEntry.getKey() + "( makes the datablock's worst " +
-							"case size greater than the bank size (" + RomConstants.BANK_SIZE + ")");
-				}
-				size += segSize;
+				
+				// See if we can set the next address to the offset
+				checkAndOffsetExpectedAddressBySize(segEntry.getValue().getWorstCaseSize(blockAddress, assignedAddresses, relAddresses),
+						!segItr.hasNext(), segEntry.getKey(), nextExpectedAddress);
 			}
 		}
 		
-		return size;
+		// Return the total size of the block
+		return nextExpectedAddress;
 	}
 	
-	private void checkAndSetRelativeAddressToSize(String segmentBeingChecked, int size, BankAddress relAddressToSet)
+	private void checkAndOffsetExpectedAddressBySize(int segSize, boolean isLast, String segmentBeingChecked, BankAddress nextExpectedAddressToSet)
 	{
-		if (size < RomConstants.BANK_SIZE)
+		if (!nextExpectedAddressToSet.offsetWithinBank(segSize))
 		{
-			relAddressToSet.setAddressInBank((short) size);
-		}
-		else if (size == RomConstants.BANK_SIZE)
-		{
-			// If we are at the limit at this is the end segment, we are fine
-			if (segmentBeingChecked.equals(endSegmentName))
-			{
-				relAddressToSet.setBank((byte) (relAddressToSet.getBank() + 1));
-				relAddressToSet.setAddressInBank((short) 0);
-			}
-			// Otherwise we have an issue
-			else
+			// If not, if it has another segment, we are in trouble regardless
+			if (!isLast)
 			{
 				throw new RuntimeException("Failed to assign relative address in the bank for the datablock \"" + 
-						getId() + "\" - The datablock's worst case size equals the bank size (" + 
-						RomConstants.BANK_SIZE + ") but there are still more segments (" + segmentBeingChecked + 
+						getId() + "\" - The datablock's worst case size is greater than or equal to the bank size (" + 
+						RomConstants.BANK_SIZE + ") and there are still more segments (" + segmentBeingChecked + 
 						") to add");
 			}
+			// But if this was the last segment, see if we just fit in the
+			// bank in which case we can set the address to the next bank and
+			// be ok
+			else if (!nextExpectedAddressToSet.fitsInBankAddressWithOffset(segSize))
+			{
+				throw new RuntimeException("Failed to assign relative address in the bank for the datablock \"" + 
+						getId() + "\" - The datablock's worst case size is greater than or equal to the bank size (" + 
+						RomConstants.BANK_SIZE + ") when adding the last segment (" + segmentBeingChecked + ")");
+			}
+			nextExpectedAddressToSet.setToCopyOf(nextExpectedAddressToSet.newAtStartOfNextBank());
 		}
 	}
 	
 	private void getSegRelAddressesStartingPoint(
-			Map<String, Segment> segmentsToUse, 
-			BankAddress blockAddress, 
+			BankAddress blockBank,
+			Map<String, Segment> orderedSegmentsToUse,
 			AssignedAddresses assignedAddresses, 
 			AssignedAddresses startingPoint
 	)
-	{
-		BankAddress allocAddress = assignedAddresses.getTry(segmentsToUse.entrySet().iterator().next().getKey());
-		if (allocAddress.isFullAddress())
+	{		
+		BankAddress baseAllocAddr = BankAddress.UNASSIGNED;
+		if (assignedAddresses != null)
+		{
+			baseAllocAddr = assignedAddresses.getTry(orderedSegmentsToUse.entrySet().iterator().next().getKey());
+		}
+		
+		if (assignedAddresses != null && baseAllocAddr.isFullAddress())
 		{
 			// This means some allocation has already been done. Leverage that for a starting
 			// point
-			for (Entry<String, Segment> segEntry : segmentsToUse.entrySet())
+			for (Entry<String, Segment> segEntry : orderedSegmentsToUse.entrySet())
 			{
-				allocAddress = assignedAddresses.getTry(segEntry.getKey());
-				if (allocAddress == null)
+				BankAddress allocAddress = assignedAddresses.getTry(segEntry.getKey());
+				if (!allocAddress.isFullAddress())
 				{
-					throw new RuntimeException("Assigned addresses for data block segment fragmentation detected for block \"" + 
-							getId() + "\" when getting relative segment starting points - Not all segments (" + 
-							segEntry.getKey() + ") are assigned addresses!");
-				}
-				else if (!allocAddress.isFullAddress())
-				{
+					// TODO: call other version below
 					throw new RuntimeException("Assigned addresses for data block segment fragmentation detected for block \"" + 
 							getId() + "\"when getting relative segment starting points - Not all are full addresses (" + 
 							segEntry.getKey() + ")!");
 				}
-				startingPoint.put(segEntry.getKey(), blockAddress.newRelativeToAddressInBank(allocAddress.getAddressInBank()));
+				int diff = baseAllocAddr.getDifference(allocAddress);
+				if (diff < 0 || diff > RomConstants.BANK_SIZE) // segBefore block or block larger than bank
+				{
+					throw new RuntimeException("TODO: use below");
+				}
+				startingPoint.put(segEntry.getKey(), new BankAddress(blockBank.getBank(), (short) diff));
 			}
 		}
 		// Otherwise we need to generate it from scratch
 		else
 		{			
-			generateSegRelAddressesStartingPoint(segmentsToUse, blockAddress, assignedAddresses, startingPoint);
+			generateSegRelAddressesStartingPoint(blockBank, orderedSegmentsToUse, startingPoint);
 		}
 	}
 	
 	private void generateSegRelAddressesStartingPoint(
-			Map<String, Segment> segmentsToUse, 
-			BankAddress blockAddress, 
-			AssignedAddresses assignedAddresses, 
+			BankAddress blockBank,
+			Map<String, Segment> orderedSegmentsToUse, 
 			AssignedAddresses startingPoint
 	)
 	{
-		BankAddress nextSegRelAddress = blockAddress.newAtStartOfBank();
-		for (Entry<String, Segment> segEntry : segmentsToUse.entrySet())
+		BankAddress nextExpectedAddress = blockBank.newAtStartOfBank();			
+		Iterator<Entry<String, Segment>> segItr = orderedSegmentsToUse.entrySet().iterator();
+		while (segItr.hasNext())
 		{
-			// If the address is null (i.e. we reached the end of the block)
-			// and we are not on the end segment, we ran out of room. 
-			if (nextSegRelAddress == null)
-			{
-				// If it is the end segment, then we are good - set the address to the start
-				// of the next bank and we are done
-				if (segEntry.getKey().equals(endSegmentName))
-				{
-					startingPoint.put(segEntry.getKey(), new BankAddress((byte) (blockAddress.getBank() + 1), (short) 0));
-					break;
-				}
-				else
-				{
-					throw new RuntimeException("Failed to assign relative address in the bank for the datablock \"" + 
-							getId() + "\" starting point - The datablock's worst case size equals the bank size (" + 
-							RomConstants.BANK_SIZE + ") but there are still more segments (" + segEntry.getKey() + 
-							") to add");
-				}
-			}
-			else 
-			{
-				startingPoint.put(segEntry.getKey(), nextSegRelAddress);
-				int segSize = segEntry.getValue().getWorstCaseSize(nextSegRelAddress, assignedAddresses, startingPoint);
-				// If its less than 0, it didn't fit at the address meaning this block is too big
-				if (segSize < 0)
-				{
-					throw new RuntimeException("Failed to assign relative address in the bank for the datablock \"" +
-							getId() + "\" starting point - Adding a segment (" + segEntry.getKey() +
-							") makes the datablock's worst case size greater than the bank size (" + 
-							RomConstants.BANK_SIZE + ")");
-				}
-				nextSegRelAddress = nextSegRelAddress.newOffsetted(segSize);
-			}
+			Entry<String, Segment> segEntry = segItr.next();
+			startingPoint.put(segEntry.getKey(), new BankAddress(nextExpectedAddress));
+			
+			// See if we can set the next address to the offset
+			checkAndOffsetExpectedAddressBySize(segEntry.getValue().getWorstCaseSize(),
+					!segItr.hasNext(), segEntry.getKey(), nextExpectedAddress);
 		}
 	}
 
 	@Override
-	public void write(SegmentedWriter writer, AssignedAddresses assignedAddresses) throws IOException
+	public BankAddress write(QueuedWriter writer, AssignedAddresses assignedAddresses) throws IOException
 	{
 		// Set the expected address to the address of this block
-		BankAddress expectedFromPrevSegAddress = new BankAddress(assignedAddresses.getThrow(id));
+		BankAddress endOfLastSegment = new BankAddress(assignedAddresses.getThrow(id));
 		
 		// Trigger a new write segment in the writer. All block segments will be written in 
 		// the same write segment
-		writer.newSegment(RomUtils.convertToGlobalAddress(expectedFromPrevSegAddress));
+		writer.startNewBlock(RomUtils.convertToGlobalAddress(endOfLastSegment));
 		
-		// End segment is handled separately below since we don't need to write for it
-		for (Entry<String, Segment> segEntry : segments.entrySet())
+		// Now write each segment keeping track of its end address to check for gaps
+		// and to return the overall write size		
+		Iterator<Entry<String, Segment>> segItr = getOrderedSegmentsById().entrySet().iterator();
+		while (segItr.hasNext())
 		{
-			BankAddress segAddress = assignedAddresses.getThrow(segEntry.getKey());
-			checkAndFillSegmentGaps(expectedFromPrevSegAddress, segAddress, writer, assignedAddresses, segEntry.getKey());
-			expectedFromPrevSegAddress.offset(segEntry.getValue().writeBytes(writer, segAddress, assignedAddresses));
+			if (RomUtils.convertToGlobalAddress(endOfLastSegment) > 124000 && RomUtils.convertToGlobalAddress(endOfLastSegment) < 124400)
+			{
+			int i = 0;
+			}
+			Entry<String, Segment> segEntry = segItr.next();
+			BankAddress nextSegAddress = assignedAddresses.getThrow(segEntry.getKey());
+			
+			// Ensure there are no gaps
+			checkAndFillSegmentGaps(endOfLastSegment, nextSegAddress, writer, segEntry.getKey());
+			
+			// See if we can set the next address to the offset - we should be able to
+			// or else the write would fail
+			checkAndOffsetExpectedAddressBySize(segEntry.getValue().writeBytes(writer, nextSegAddress, assignedAddresses),
+					!segItr.hasNext(), segEntry.getKey(), endOfLastSegment);
 		}
+		return endOfLastSegment;
+	}
+	
+	@Override
+	public void checkAndFillSegmentGaps(
+			BankAddress endOfPreviousSegment,
+			BankAddress foundNextAddress, 
+			QueuedWriter writer,
+			String nextSegName
+	) throws IOException
+	{
+		int diff = endOfPreviousSegment.getDifference(foundNextAddress);
 		
-		// End reference has no code but still need to check its where we expect
-		checkAndFillSegmentGaps(expectedFromPrevSegAddress, assignedAddresses.getThrow(getEndSegmentId()), writer, assignedAddresses, getEndSegmentId());
+		// If we endOfPreviousSegment (previous + size) is before the next segment,
+		// then fill with nops
+		if (diff > 0)
+		{
+			new Nop(diff).writeBytes(writer, endOfPreviousSegment, null);
+		}
+		// If its higher than the next address, then we would overwrite the data so throw
+		else if (diff < 0)
+		{
+			throw new IllegalArgumentException("Encountered error while writing - the end of the previous segment (" + 
+					endOfPreviousSegment.toString() + ") is greater than the next address (" + foundNextAddress.toString() + 
+					") meaning some bytes would be overwritten when writing segment ID " + nextSegName + " of block " + id);
+		}
+		// else do nothing - we are good
 	}
 }

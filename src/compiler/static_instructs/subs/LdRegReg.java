@@ -2,7 +2,7 @@ package compiler.static_instructs.subs;
 
 import java.io.IOException;
 
-import gbc_framework.SegmentedWriter;
+import gbc_framework.QueuedWriter;
 import compiler.CompilerConstants.Register;
 import compiler.static_instructs.Ld;
 
@@ -19,7 +19,7 @@ public class LdRegReg extends Ld
 	}
 
 	@Override
-	public void writeStaticBytes(SegmentedWriter writer) throws IOException
+	public void writeStaticBytes(QueuedWriter writer) throws IOException
 	{
 		writer.append((byte) (0x40 | (to.getValue() << 3) | (from.getValue())));
 	}
