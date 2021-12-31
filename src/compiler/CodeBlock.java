@@ -266,6 +266,7 @@ public class CodeBlock implements SegmentedByteBlock
 				}
 				
 				// See if we can set the next address to the offset
+				// TODO: Temp unfix to check overwrite protection:  blockAddress -> nextExpectedAddress
 				checkAndOffsetExpectedAddressBySize(segEntry.getValue().getWorstCaseSize(blockAddress, assignedAddresses, relAddresses),
 						!segItr.hasNext(), segEntry.getKey(), nextExpectedAddress);
 			}
@@ -376,15 +377,14 @@ public class CodeBlock implements SegmentedByteBlock
 		Iterator<Entry<String, Segment>> segItr = getOrderedSegmentsById().entrySet().iterator();
 		while (segItr.hasNext())
 		{
-			if (RomUtils.convertToGlobalAddress(endOfLastSegment) > 124000 && RomUtils.convertToGlobalAddress(endOfLastSegment) < 124400)
-			{
-			int i = 0;
-			}
 			Entry<String, Segment> segEntry = segItr.next();
 			BankAddress nextSegAddress = assignedAddresses.getThrow(segEntry.getKey());
 			
 			// Ensure there are no gaps
 			checkAndFillSegmentGaps(endOfLastSegment, nextSegAddress, writer, segEntry.getKey());
+			
+			// TODO: temp fix?
+			endOfLastSegment.setToCopyOf(nextSegAddress);
 			
 			// See if we can set the next address to the offset - we should be able to
 			// or else the write would fail

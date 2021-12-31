@@ -208,7 +208,7 @@ public abstract class JumpCallCommon implements Instruction
 			if (conditions != InstructionConditions.NONE)
 			{
 				// Write a local JR to skip the farcall/jp
-				writeSize += writeJr(writer, instructionAddress, (byte) 4);
+				writeSize += writeJr(writer, (byte) 4);
 			}
 			
 			writeSize += writeFarJpCall(writer, instructionAddress, toGoToAddress);
@@ -251,7 +251,7 @@ public abstract class JumpCallCommon implements Instruction
 		return 4;
 	}
 	
-	protected int writeJr(QueuedWriter writer, BankAddress instructionAddress, byte relAddress) throws IOException 
+	protected int writeJr(QueuedWriter writer, byte relAddress) throws IOException 
 	{
 		writeJr(writer, conditions, relAddress);
 		return 2;

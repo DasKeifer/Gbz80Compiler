@@ -137,7 +137,7 @@ public class Jump extends JumpCallCommon
 		// See if we want to JR
 		if (canJr(instructionAddress, addressToGoTo))
 		{
-			return writeJr(writer, instructionAddress, (byte) getJrValue(instructionAddress, addressToGoTo));
+			return writeJr(writer, (byte) getJrValue(instructionAddress, addressToGoTo));
 		}
 		// Otherwise its a normal jump or farjump
 		else
