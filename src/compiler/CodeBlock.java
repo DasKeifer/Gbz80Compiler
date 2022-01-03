@@ -266,8 +266,8 @@ public class CodeBlock implements SegmentedByteBlock
 				}
 				
 				// See if we can set the next address to the offset
-				// TODO: Temp unfix to check overwrite protection:  blockAddress -> nextExpectedAddress
-				checkAndOffsetExpectedAddressBySize(segEntry.getValue().getWorstCaseSize(blockAddress, assignedAddresses, relAddresses),
+				checkAndOffsetExpectedAddressBySize(segEntry.getValue().getWorstCaseSize(
+							nextExpectedAddress, assignedAddresses, relAddresses),
 						!segItr.hasNext(), segEntry.getKey(), nextExpectedAddress);
 			}
 		}
@@ -370,7 +370,7 @@ public class CodeBlock implements SegmentedByteBlock
 		
 		// Trigger a new write segment in the writer. All block segments will be written in 
 		// the same write segment
-		writer.startNewBlock(RomUtils.convertToGlobalAddress(endOfLastSegment));
+		writer.startNewBlock(RomUtils.convertToGlobalAddress(endOfLastSegment), id + "_Hunk");
 		
 		// Now write each segment keeping track of its end address to check for gaps
 		// and to return the overall write size		
