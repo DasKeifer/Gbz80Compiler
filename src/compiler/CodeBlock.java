@@ -19,6 +19,7 @@ import gbc_framework.SegmentedByteBlock;
 import gbc_framework.RomConstants;
 import gbc_framework.rom_addressing.AssignedAddresses;
 import gbc_framework.rom_addressing.BankAddress;
+import gbc_framework.rom_addressing.BankAddress.BankAddressLimitType;
 import gbc_framework.utils.RomUtils;
 
 public class CodeBlock implements SegmentedByteBlock
@@ -278,7 +279,7 @@ public class CodeBlock implements SegmentedByteBlock
 	
 	private void checkAndOffsetExpectedAddressBySize(int segSize, boolean isLast, String segmentBeingChecked, BankAddress nextExpectedAddressToSet)
 	{
-		if (!nextExpectedAddressToSet.offsetWithinBank(segSize))
+		if (!nextExpectedAddressToSet.offset(segSize, BankAddressLimitType.WITHIN_BANK))
 		{
 			// If not, if it has another segment, we are in trouble regardless
 			if (!isLast)
@@ -291,7 +292,7 @@ public class CodeBlock implements SegmentedByteBlock
 			// But if this was the last segment, see if we just fit in the
 			// bank in which case we can set the address to the next bank and
 			// be ok
-			else if (!nextExpectedAddressToSet.fitsInBankAddressWithOffset(segSize))
+			else if (!nextExpectedAddressToSet.offsetFits(segSize, BankAddressLimitType.WITHIN_BANK_OR_START_OF_NEXT))
 			{
 				throw new RuntimeException("Failed to assign relative address in the bank for the datablock \"" + 
 						getId() + "\" - The datablock's worst case size is greater than or equal to the bank size (" + 

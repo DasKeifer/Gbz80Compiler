@@ -10,6 +10,7 @@ import compiler.reference_instructs.PlaceholderInstruction;
 import gbc_framework.RomConstants;
 import gbc_framework.rom_addressing.AssignedAddresses;
 import gbc_framework.rom_addressing.BankAddress;
+import gbc_framework.rom_addressing.BankAddress.BankAddressLimitType;
 
 public class Segment
 {
@@ -52,25 +53,31 @@ public class Segment
 			segmentAddress = segmentAddress.newAtStartOfBank();
 		}
 		
-		BankAddress instructAddr = segmentAddress;
+		BankAddress instructAddr = new BankAddress(segmentAddress);
 		for (Instruction item : data)
 		{
-			int instructSize = item.getWorstCaseSize(instructAddr, assignedAddresses, tempIndexes);
-			// If it doesn't fit, we have an issue
-			if (!instructAddr.fitsInBankAddressWithOffset(instructSize))
+			// If it doesn't fit within the bank or at the start of the next, we have an issue
+			if (!instructAddr.offset(item.getWorstCaseSize(instructAddr, assignedAddresses, tempIndexes), BankAddressLimitType.WITHIN_BANK_OR_START_OF_NEXT))
 			{
 				return -1;
 			}
-			instructAddr = instructAddr.newOffsettedWithinBank(instructSize);
 		}
 		
-		// The instruction can be null if the last instruction perfectly aligned with the end
-		// of the bank
-		if (instructAddr == null)
+		// If its a new bank and its not just at the start, then we have an issue as well
+		if (instructAddr.isSameBank(segmentAddress))
 		{
-			return RomConstants.BANK_SIZE - segmentAddress.getAddressInBank();
+			return instructAddr.getAddressInBank() - segmentAddress.getAddressInBank();
 		}
-		return instructAddr.getAddressInBank() - segmentAddress.getAddressInBank();
+		// If its just in the next bank, its fine as its non-inclusive
+		else if (instructAddr.getAddressInBank() == 0)
+		{
+			return RomConstants.BANK_SIZE - instructAddr.getAddressInBank();
+		}
+		// Otherwise we got lucky and got past the above check while offsetting from instructions
+		else
+		{
+			return -1;
+		}
 	}
 	
 	public void fillPlaceholders(Map<String, String> placeholderToArgs, InstructionParser instructParser)
@@ -86,7 +93,7 @@ public class Segment
 		BankAddress instructAddress = new BankAddress(segmentStartAddress);
 		for (Instruction item : data)
 		{
-			instructAddress.offsetWithinBank(item.writeBytes(writer, instructAddress, assignedAddresses));
+			instructAddress.offset(item.writeBytes(writer, instructAddress, assignedAddresses), BankAddressLimitType.WITHIN_BANK);
 		}
 		
 		return segmentStartAddress.getDifference(instructAddress);
