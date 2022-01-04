@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.util.Map;
 
 import gbc_framework.QueuedWriter;
-import compiler.CompilerUtils;
+import gbc_framework.SegmentNamingUtils;
 import compiler.Instruction;
 import compiler.InstructionParser;
 import gbc_framework.rom_addressing.AssignedAddresses;
@@ -25,7 +25,7 @@ public class PlaceholderInstruction implements Instruction
 	
 	public static PlaceholderInstruction create(String line, String rootBlockName)
 	{
-		if (CompilerUtils.containsPlaceholder(line) || CompilerUtils.containsPlaceholder(rootBlockName))
+		if (SegmentNamingUtils.containsPlaceholder(line) || SegmentNamingUtils.containsPlaceholder(rootBlockName))
 		{
 			return new PlaceholderInstruction(line, rootBlockName);
 		}
@@ -34,8 +34,8 @@ public class PlaceholderInstruction implements Instruction
 
 	public void fillPlaceholdersAndCreateInstruction(Map<String, String> placeholderToArgs, InstructionParser instructParser)
 	{
-		String lineReplaced = CompilerUtils.replacePlaceholders(line, placeholderToArgs);
-		String rootBlockNameReplaced = CompilerUtils.replacePlaceholders(rootBlockName, placeholderToArgs);
+		String lineReplaced = SegmentNamingUtils.replacePlaceholders(line, placeholderToArgs);
+		String rootBlockNameReplaced = SegmentNamingUtils.replacePlaceholders(rootBlockName, placeholderToArgs);
 		inst = instructParser.parseInstruction(lineReplaced, rootBlockNameReplaced);
 	}
 

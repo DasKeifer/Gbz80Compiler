@@ -43,7 +43,6 @@ public class RawBytes extends StaticInstruction
 		return size;
 	}	
 	
-	// TODO: Consolidate with above?
 	private static int determineSize(List<byte[]> bytes)
 	{
 		int size = 0;

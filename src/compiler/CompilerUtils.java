@@ -2,11 +2,10 @@ package compiler;
 
 
 import java.util.Arrays;
-import java.util.Map;
-import java.util.Map.Entry;
 
 import compiler.CompilerConstants.*;
 import compiler.reference_instructs.*;
+import gbc_framework.SegmentNamingUtils;
 import gbc_framework.utils.ByteUtils;
 
 public final class CompilerUtils 
@@ -14,11 +13,9 @@ public final class CompilerUtils
 	private CompilerUtils() {}
 	
 	static final String SEGMENT_ENDLINE = ":";
-	static final String SUBSEGMENT_STARTLINE = ".";
 	static final String STRING_QUOTE = "\n";
 	static final String LINE_BREAK = "\n";
 	static final String HEX_VAL_MARKER = "$";
-	static final String PLACEHOLDER_MARKER = "#";
 	
 	public static String tryParseSegmentName(String line)
 	{
@@ -34,23 +31,13 @@ public final class CompilerUtils
 		return line.substring(0, line.indexOf(CompilerUtils.SEGMENT_ENDLINE)).trim();
 	}
 	
-	public static boolean isOnlySubsegmentPartOfLabel(String line)
-	{
-		return line.startsWith(CompilerUtils.SUBSEGMENT_STARTLINE);
-	}
-	
 	public static String tryParseFullSubsegmentName(String line, String rootSegmentName)
 	{
-		if (isOnlySubsegmentPartOfLabel(line))
+		if (SegmentNamingUtils.isOnlySubsegmentPartOfLabel(line))
 		{
 			return getSubsegmentName(line, rootSegmentName);
 		}
 		return null;
-	}
-	
-	public static String formSubsegmentName(String subsegment, String rootSegmentName)
-	{
-		return rootSegmentName + "." + subsegment;
 	}
 	
 	private static String getSubsegmentName(String line, String rootSegmentName)
@@ -68,6 +55,11 @@ public final class CompilerUtils
 		}
 		
 		return null;
+	}
+	
+	public static boolean parseBoolArg(String string) 
+	{
+		return Boolean.parseBoolean(string);
 	}
 	
 	public static byte parseByteArg(String arg)
@@ -171,35 +163,12 @@ public final class CompilerUtils
 	public static String formSegmentLabelArg(String arg, String rootSegment)
 	{
 		String trimmed = arg.trim();
-		if (trimmed.startsWith(SUBSEGMENT_STARTLINE))
+		if (SegmentNamingUtils.isOnlySubsegmentPartOfLabel(trimmed))
 		{
 			return rootSegment + trimmed;
 		}
 		// Otherwise we assume its the full name
 		return trimmed;
-	}
-	
-	public static boolean containsPlaceholder(String line)
-	{
-		return line.contains(PLACEHOLDER_MARKER);
-	}
-	
-	public static String createPlaceholder(String placeholderId)
-	{
-		return PLACEHOLDER_MARKER + placeholderId + PLACEHOLDER_MARKER;
-	}
-	
-	public static String replacePlaceholders(String line, Map<String, String> placeholderToArgs)
-	{
-		for (Entry<String, String> entry : placeholderToArgs.entrySet())
-		{
-			if (!entry.getKey().startsWith(PLACEHOLDER_MARKER) || !entry.getKey().endsWith(PLACEHOLDER_MARKER))
-			{
-				throw new IllegalArgumentException("Non placeholder key passed: " + entry.getKey());
-			}
-			line = line.replace(entry.getKey(), entry.getValue());
-		}
-		return line;
 	}
 	
 	public static String[] splitInstruction(String line)
@@ -220,7 +189,7 @@ public final class CompilerUtils
 	
 	public static boolean containsImplicitPlaceholder(String line, String rootSegment)
 	{
-		if (!containsPlaceholder(rootSegment))
+		if (!SegmentNamingUtils.containsPlaceholder(rootSegment))
 		{
 			return false;
 		}

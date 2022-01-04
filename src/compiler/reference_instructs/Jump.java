@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.Arrays;
 
 import gbc_framework.QueuedWriter;
+import gbc_framework.SegmentNamingUtils;
 import compiler.CompilerUtils;
 import compiler.CompilerConstants.InstructionConditions;
 import gbc_framework.rom_addressing.AssignedAddresses;
@@ -69,7 +70,7 @@ public class Jump extends JumpCallCommon
 			throw new IllegalArgumentException(offsetError + Arrays.toString(args));
 		}
 
-		if (CompilerUtils.isOnlySubsegmentPartOfLabel(labelToJumpTo))
+		if (SegmentNamingUtils.isOnlySubsegmentPartOfLabel(labelToJumpTo))
 		{
 			return new Jump(CompilerUtils.formSegmentLabelArg(labelToJumpTo, rootSegment), conditions);
 		}

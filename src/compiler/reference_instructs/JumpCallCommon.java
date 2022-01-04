@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.Arrays;
 
 import gbc_framework.QueuedWriter;
+import gbc_framework.SegmentNamingUtils;
 import compiler.CompilerUtils;
 import compiler.Instruction;
 import gbc_framework.utils.ByteUtils;
@@ -66,7 +67,7 @@ public abstract class JumpCallCommon implements Instruction
 		}
 		
 		// If its a subsegment it uses the root segment
-		return CompilerUtils.isOnlySubsegmentPartOfLabel(labelOrAddrToGoTo);
+		return SegmentNamingUtils.isOnlySubsegmentPartOfLabel(labelOrAddrToGoTo);
 	}
 	
 	
@@ -120,7 +121,7 @@ public abstract class JumpCallCommon implements Instruction
 		{
 			if (isJp)
 			{
-				if (CompilerUtils.isOnlySubsegmentPartOfLabel(labelOrAddrToGoTo))
+				if (SegmentNamingUtils.isOnlySubsegmentPartOfLabel(labelOrAddrToGoTo))
 				{	
 					return new Jump(CompilerUtils.formSegmentLabelArg(labelOrAddrToGoTo, rootSegment), conditions);
 				}
@@ -128,7 +129,7 @@ public abstract class JumpCallCommon implements Instruction
 			}
 			else
 			{
-				if (CompilerUtils.isOnlySubsegmentPartOfLabel(labelOrAddrToGoTo))
+				if (SegmentNamingUtils.isOnlySubsegmentPartOfLabel(labelOrAddrToGoTo))
 				{	
 					return new Call(CompilerUtils.formSegmentLabelArg(labelOrAddrToGoTo, rootSegment), conditions);
 				}
@@ -211,16 +212,16 @@ public abstract class JumpCallCommon implements Instruction
 				writeSize += writeJr(writer, (byte) 4);
 			}
 			
-			writeSize += writeFarJpCall(writer, instructionAddress, toGoToAddress);
+			writeSize += writeFarJpCall(writer, toGoToAddress);
 			return writeSize;
 		}
 		else
 		{
-			return writeJpCall(writer, instructionAddress, toGoToAddress);
+			return writeJpCall(writer, toGoToAddress);
 		}
 	}
 	
-	protected int writeJpCall(QueuedWriter writer, BankAddress instructionAddress, BankAddress addressToGoTo) throws IOException 
+	protected int writeJpCall(QueuedWriter writer, BankAddress addressToGoTo) throws IOException 
 	{		
 		// always call
 		if (InstructionConditions.NONE == conditions)
@@ -238,7 +239,7 @@ public abstract class JumpCallCommon implements Instruction
 		return 3;
 	}
 
-	protected int writeFarJpCall(QueuedWriter writer, BankAddress instructionAddress, BankAddress addressToGoTo) throws IOException 
+	protected int writeFarJpCall(QueuedWriter writer, BankAddress addressToGoTo) throws IOException 
 	{		
 		// This is an "RST" call (id 0xC7). These are special calls loaded into the ROM at the beginning. For
 		// this ROM, RST5 (id 0x28) jumps to the "FarCall" function in the home.asm which handles

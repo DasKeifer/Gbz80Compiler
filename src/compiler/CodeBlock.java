@@ -17,6 +17,7 @@ import java.util.Set;
 
 import gbc_framework.SegmentedByteBlock;
 import gbc_framework.RomConstants;
+import gbc_framework.SegmentNamingUtils;
 import gbc_framework.rom_addressing.AssignedAddresses;
 import gbc_framework.rom_addressing.BankAddress;
 import gbc_framework.rom_addressing.BankAddress.BankAddressLimitType;
@@ -29,6 +30,7 @@ public class CodeBlock implements SegmentedByteBlock
 
 	private String rootSegmentName;
 	private Segment currSegment;
+	private boolean allowNopJrOptimization; //Have to manually enable
 	
 	private static InstructionParser instructParserSingleton = new InstructionParser();
 	
@@ -63,6 +65,7 @@ public class CodeBlock implements SegmentedByteBlock
 	{
 		segments = new LinkedHashMap<>();
 		this.id = id;
+		allowNopJrOptimization = false;
 		newSegment(id);
 	}
 	
@@ -90,7 +93,7 @@ public class CodeBlock implements SegmentedByteBlock
 		if (segName == null)
 		{
 			// If its a placeholder, we defer filling it out
-			if (CompilerUtils.containsPlaceholder(line) || CompilerUtils.containsImplicitPlaceholder(line, rootSegmentName))
+			if (SegmentNamingUtils.containsPlaceholder(line) || CompilerUtils.containsImplicitPlaceholder(line, rootSegmentName))
 			{
 				appendPlaceholderInstruction(PlaceholderInstruction.create(line, rootSegmentName));
 			}
@@ -134,9 +137,32 @@ public class CodeBlock implements SegmentedByteBlock
 		currSegment.appendPlaceholderInstruction(instruct);
 	}
 	
+	public CodeBlock appendPlaceholderInstructionInline(PlaceholderInstruction instruct)
+	{
+		appendPlaceholderInstruction(instruct);
+		return this;
+	}
+	
 	public void appendInstruction(Instruction instruct)
 	{
 		currSegment.appendInstruction(instruct);
+	}
+	
+	public CodeBlock appendInstructionInline(Instruction instruct)
+	{
+		appendInstruction(instruct);
+		return this;
+	}
+	
+	public void allowNopJrOptimization()
+	{
+		allowNopJrOptimization = true;
+	}
+	
+	public CodeBlock allowNopJrOptimizationInline()
+	{
+		allowNopJrOptimization();
+		return this;
 	}
 	
 	@Override
@@ -158,14 +184,14 @@ public class CodeBlock implements SegmentedByteBlock
 	public void replacePlaceholderIds(Map<String, String> placeholderToArgsForIds)
 	{
 		// Replace placeholders in Id
-		id = CompilerUtils.replacePlaceholders(id, placeholderToArgsForIds);
+		id = SegmentNamingUtils.replacePlaceholders(id, placeholderToArgsForIds);
 		
 		LinkedHashMap<String, Segment> refreshedSegments = new LinkedHashMap<>();
 		// Use segments because we know we don't need to replace anything in the
 		// end segment placeholder
 		for (Entry<String, Segment> seg : segments.entrySet())
 		{
-			String segId = CompilerUtils.replacePlaceholders(seg.getKey(), placeholderToArgsForIds);
+			String segId = SegmentNamingUtils.replacePlaceholders(seg.getKey(), placeholderToArgsForIds);
 			seg.getValue().fillPlaceholders(placeholderToArgsForIds, instructParserSingleton);
 			
 			if (refreshedSegments.put(segId, seg.getValue()) != null)
@@ -324,15 +350,20 @@ public class CodeBlock implements SegmentedByteBlock
 				BankAddress allocAddress = assignedAddresses.getTry(segEntry.getKey());
 				if (!allocAddress.isFullAddress())
 				{
-					// TODO: call other version below
-					throw new RuntimeException("Assigned addresses for data block segment fragmentation detected for block \"" + 
+					// We could call the other version but this would hint at an underlying issue
+					// that probably would need to be resolved so we don't
+					throw new RuntimeException("Internal error occured while assigned addresses: Segment fragmentation detected for block \"" + 
 							getId() + "\"when getting relative segment starting points - Not all are full addresses (" + 
 							segEntry.getKey() + ")!");
 				}
 				int diff = baseAllocAddr.getDifference(allocAddress);
 				if (diff < 0 || diff > RomConstants.BANK_SIZE) // segBefore block or block larger than bank
 				{
-					throw new RuntimeException("TODO: use below");
+					// We could call the other version but this would hint at an underlying issue
+					// that probably would need to be resolved so we don't
+					throw new RuntimeException("Internal error occured while assigned addresses: Failed to extract "
+							+ "segment address difference (found " + diff + " but must be between 0 and " + 
+							RomConstants.BANK_SIZE + ")");
 				}
 				startingPoint.put(segEntry.getKey(), new BankAddress(blockBank.getBank(), (short) diff));
 			}
@@ -384,7 +415,7 @@ public class CodeBlock implements SegmentedByteBlock
 			// Ensure there are no gaps
 			checkAndFillSegmentGaps(endOfLastSegment, nextSegAddress, writer, segEntry.getKey());
 			
-			// TODO: temp fix?
+			// Now shift the end of last to found segment address
 			endOfLastSegment.setToCopyOf(nextSegAddress);
 			
 			// See if we can set the next address to the offset - we should be able to
@@ -409,7 +440,7 @@ public class CodeBlock implements SegmentedByteBlock
 		// then fill with nops
 		if (diff > 0)
 		{
-			new Nop(diff).writeBytes(writer, endOfPreviousSegment, null);
+			new Nop(diff, allowNopJrOptimization).writeBytes(writer, endOfPreviousSegment, null);
 		}
 		// If its higher than the next address, then we would overwrite the data so throw
 		else if (diff < 0)
