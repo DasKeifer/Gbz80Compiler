@@ -93,7 +93,8 @@ public class Segment
 		BankAddress instructAddress = new BankAddress(segmentStartAddress);
 		for (Instruction item : data)
 		{
-			instructAddress.offset(item.writeBytes(writer, instructAddress, assignedAddresses), BankAddressLimitType.WITHIN_BANK);
+			instructAddress.offset(
+					item.writeBytes(writer, instructAddress, assignedAddresses), BankAddressLimitType.WITHIN_BANK);
 		}
 		
 		return segmentStartAddress.getDifference(instructAddress);

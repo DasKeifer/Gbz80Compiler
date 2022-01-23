@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -18,6 +19,7 @@ import java.util.Set;
 import gbc_framework.SegmentedByteBlock;
 import gbc_framework.RomConstants;
 import gbc_framework.SegmentNamingUtils;
+import gbc_framework.rom_addressing.AddressRange;
 import gbc_framework.rom_addressing.AssignedAddresses;
 import gbc_framework.rom_addressing.BankAddress;
 import gbc_framework.rom_addressing.BankAddress.BankAddressLimitType;
@@ -25,8 +27,10 @@ import gbc_framework.utils.RomUtils;
 
 public class CodeBlock implements SegmentedByteBlock
 {	
-	LinkedHashMap<String, Segment> segments; // linked to keep order
 	private String id;
+	private List<AddressRange> reuseHints;
+	
+	LinkedHashMap<String, Segment> segments; // linked to keep order
 
 	private String rootSegmentName;
 	private Segment currSegment;
@@ -63,8 +67,10 @@ public class CodeBlock implements SegmentedByteBlock
 	
 	private void setDataBlockCommonData(String id)
 	{
-		segments = new LinkedHashMap<>();
 		this.id = id;
+		reuseHints = new LinkedList<>();
+		
+		segments = new LinkedHashMap<>();
 		allowNopJrOptimization = false;
 		newSegment(id);
 	}
@@ -218,24 +224,6 @@ public class CodeBlock implements SegmentedByteBlock
 		}
 		return blockAddress.newAtStartOfBank().getDifference(
 				getSegmentsRelativeAddresses(blockAddress, assignedAddresses, null)); // null = don't care about the relative address of segments
-	}
-		
-	@Override
-	public void assignBank(byte bank, AssignedAddresses assignedAddresses)
-	{
-		for (String segId : getOrderedSegmentsById().keySet())
-		{
-			assignedAddresses.putBankOnly(segId, bank);
-		}
-	}
-
-	@Override
-	public void removeAddresses(AssignedAddresses assignedAddresses)
-	{
-		for (String segId : getOrderedSegmentsById().keySet())
-		{
-			assignedAddresses.remove(segId);
-		}
 	}
 
 	@Override
@@ -393,7 +381,13 @@ public class CodeBlock implements SegmentedByteBlock
 					!segItr.hasNext(), segEntry.getKey(), nextExpectedAddress);
 		}
 	}
-
+	
+	@Override
+	public void addByteSourceHint(AddressRange hint)
+	{
+		reuseHints.add(hint);
+	}
+	
 	@Override
 	public BankAddress write(QueuedWriter writer, AssignedAddresses assignedAddresses) throws IOException
 	{
@@ -402,7 +396,7 @@ public class CodeBlock implements SegmentedByteBlock
 		
 		// Trigger a new write segment in the writer. All block segments will be written in 
 		// the same write segment
-		writer.startNewBlock(RomUtils.convertToGlobalAddress(endOfLastSegment), id + "_Hunk");
+		writer.startNewBlock(RomUtils.convertToGlobalAddress(endOfLastSegment), id + "_Hunk", reuseHints);
 		
 		// Now write each segment keeping track of its end address to check for gaps
 		// and to return the overall write size		
@@ -420,7 +414,8 @@ public class CodeBlock implements SegmentedByteBlock
 			
 			// See if we can set the next address to the offset - we should be able to
 			// or else the write would fail
-			checkAndOffsetExpectedAddressBySize(segEntry.getValue().writeBytes(writer, nextSegAddress, assignedAddresses),
+			checkAndOffsetExpectedAddressBySize(
+					segEntry.getValue().writeBytes(writer, nextSegAddress, assignedAddresses),
 					!segItr.hasNext(), segEntry.getKey(), endOfLastSegment);
 		}
 		return endOfLastSegment;
