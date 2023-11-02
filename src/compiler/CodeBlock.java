@@ -1,7 +1,6 @@
 package compiler;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -11,7 +10,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import gbc_framework.QueuedWriter;
-import compiler.reference_instructs.PlaceholderInstruction;
 import compiler.static_instructs.Nop;
 
 import java.util.Set;
@@ -34,14 +32,7 @@ public class CodeBlock implements SegmentedByteBlock
 
 	private String rootSegmentName;
 	private Segment currSegment;
-	private boolean allowNopJrOptimization; //Have to manually enable
-	
-	private static InstructionParser instructParserSingleton = new InstructionParser();
-	
-	public static void setInstructionParserSingleton(InstructionParser instructParserToUseForAllDataBlocks)
-	{
-		instructParserSingleton = instructParserToUseForAllDataBlocks;
-	}
+	private boolean allowNopJrOptimization; //Have to manually enable for now
 	
 	// Constructor to keep instruction/line less constructors from being ambiguous
 	public CodeBlock(String startingSegmentName)
@@ -49,23 +40,7 @@ public class CodeBlock implements SegmentedByteBlock
 		setDataBlockCommonData(startingSegmentName.trim());
 	}
 	
-	public CodeBlock(List<String> sourceLines)
-	{
-		List<String> sourceLinesTrimmed = new ArrayList<>(sourceLines);
-		String segName = CompilerUtils.tryParseSegmentName(sourceLinesTrimmed.remove(0));
-		if (segName == null)
-		{
-			throw new IllegalArgumentException("The first line must be a Segment label (i.e. the segment name followed by a ':'");
-		}
-		setDataBlockCommonData(segName);
-
-		for (String line : sourceLinesTrimmed)
-		{
-			parseLine(line);
-		}
-	}
-	
-	private void setDataBlockCommonData(String id)
+	protected void setDataBlockCommonData(String id)
 	{
 		this.id = id;
 		reuseHints = new LinkedList<>();
@@ -73,41 +48,6 @@ public class CodeBlock implements SegmentedByteBlock
 		segments = new LinkedHashMap<>();
 		allowNopJrOptimization = false;
 		newSegment(id);
-	}
-	
-	private void parseLine(String line)
-	{
-		// split of the instruction (if there is one)
-		line = line.trim();
-		
-		String segName = CompilerUtils.tryParseSegmentName(line);
-		// If its not null, its a new segment
-		if (segName != null)
-		{
-			newSegment(segName);
-		}
-		else // Otherwise see if its a subsegment
-		{
-			segName = CompilerUtils.tryParseFullSubsegmentName(line, rootSegmentName);
-			if (segName != null)
-			{
-				newSubSegment(segName);
-			}
-		}
-
-		// If its not a segment, then its a line that will turn into bytes
-		if (segName == null)
-		{
-			// If its a placeholder, we defer filling it out
-			if (SegmentNamingUtils.containsPlaceholder(line) || CompilerUtils.containsImplicitPlaceholder(line, rootSegmentName))
-			{
-				appendPlaceholderInstruction(PlaceholderInstruction.create(line, rootSegmentName));
-			}
-			else
-			{
-				appendInstruction(instructParserSingleton.parseInstruction(line, rootSegmentName));
-			}
-		}
 	}
 	
 	public void newSubSegment(String fullSubSegName)
@@ -129,24 +69,8 @@ public class CodeBlock implements SegmentedByteBlock
 		// Ensure there was no conflict within the block
 		if (segments.put(name, currSegment) != null)
 		{
-			throw new IllegalArgumentException("Duplicate segment label was found: " + rootSegmentName);
+			throw new IllegalArgumentException("Duplicate segment label was found: " + getRootSegmentName());
 		}
-	}
-	
-	public void parseAppendInstruction(String instruct)
-	{
-		parseLine(instruct);
-	}
-	
-	public void appendPlaceholderInstruction(PlaceholderInstruction instruct)
-	{
-		currSegment.appendPlaceholderInstruction(instruct);
-	}
-	
-	public CodeBlock appendPlaceholderInstructionInline(PlaceholderInstruction instruct)
-	{
-		appendPlaceholderInstruction(instruct);
-		return this;
 	}
 	
 	public void appendInstruction(Instruction instruct)
@@ -187,7 +111,7 @@ public class CodeBlock implements SegmentedByteBlock
 		return new LinkedHashMap<>(segments);
 	}
 
-	public void replacePlaceholderIds(Map<String, String> placeholderToArgsForIds)
+	public void replacePlaceholders(Map<String, String> placeholderToArgsForIds)
 	{
 		// Replace placeholders in Id
 		id = SegmentNamingUtils.replacePlaceholders(id, placeholderToArgsForIds);
@@ -198,7 +122,7 @@ public class CodeBlock implements SegmentedByteBlock
 		for (Entry<String, Segment> seg : segments.entrySet())
 		{
 			String segId = SegmentNamingUtils.replacePlaceholders(seg.getKey(), placeholderToArgsForIds);
-			seg.getValue().fillPlaceholders(placeholderToArgsForIds, instructParserSingleton);
+			seg.getValue().replacePlaceholders(placeholderToArgsForIds);
 			
 			if (refreshedSegments.put(segId, seg.getValue()) != null)
 			{
@@ -445,5 +369,10 @@ public class CodeBlock implements SegmentedByteBlock
 					") meaning some bytes would be overwritten when writing segment ID " + nextSegName + " of block " + id);
 		}
 		// else do nothing - we are good
+	}
+
+	public String getRootSegmentName() 
+	{
+		return rootSegmentName;
 	}
 }

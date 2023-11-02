@@ -4,7 +4,6 @@ package compiler;
 import java.util.Arrays;
 
 import compiler.CompilerConstants.*;
-import compiler.reference_instructs.*;
 import gbc_framework.SegmentNamingUtils;
 import gbc_framework.utils.ByteUtils;
 
@@ -76,10 +75,25 @@ public final class CompilerUtils
 	{
 		return ByteUtils.parseByte(extractHexValString(arg, 2, 2));
 	}
+	
+	public static short parseBankLoadedAddrArg(String arg)
+	{
+		short addr = (short) ByteUtils.parseBytes(extractHexValString(arg, 6), 3);
+		if (addr >= CompilerConstants.MAX_LOADED_SIZE || addr < 0)
+		{
+			throw new IllegalArgumentException("Bad bank loaded address found: " + addr);
+		}
+		return addr;
+	}
 
 	public static int parseGlobalAddrArg(String arg)
 	{
-		return (int) ByteUtils.parseBytes(extractHexValString(arg, 6), 3);
+		int addr = (int) ByteUtils.parseBytes(extractHexValString(arg, 6), 3);
+		if (addr >= CompilerConstants.MAX_SIZE || addr < 0)
+		{
+			throw new IllegalArgumentException("Bad bank loaded address found: " + addr);
+		}
+		return addr;
 	}
 
 	private static String extractHexValString(String arg, int numChars)
@@ -177,38 +191,9 @@ public final class CompilerUtils
 		return Arrays.stream(line.split(" ", 2)).map(String::trim).toArray(String[]::new);
 	}
 
-	public static String[] splitArgs(String[] keyArgs)
+	public static String[] splitArgs(String args)
 	{
-		if (keyArgs.length > 1)
-		{
-			// Split and trim the array
-			return Arrays.stream(keyArgs[1].split(",")).map(String::trim).toArray(String[]::new);
-		}
-		return new String[0];
-	}
-	
-	public static boolean containsImplicitPlaceholder(String line, String rootSegment)
-	{
-		if (!SegmentNamingUtils.containsPlaceholder(rootSegment))
-		{
-			return false;
-		}
-		
-		String[] keyArgs = splitInstruction(line);
-		String[] args = splitArgs(keyArgs);
-		
-		// Any instruction that takes the root segment may have a hidden placeholder
-		switch (keyArgs[0])
-		{
-			case "jr":
-			case "jp":
-			case "farjump":
-				return JumpCallCommon.useRootSegment(args, true);
-			case "call":
-			case "farcall":
-				return JumpCallCommon.useRootSegment(args, false);
-			default:
-				return false;
-		}
+		// Split and trim the array
+		return Arrays.stream(args.split(",")).map(String::trim).toArray(String[]::new);
 	}
 }

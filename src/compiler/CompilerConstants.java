@@ -4,6 +4,12 @@ import gbc_framework.utils.ByteUtils;
 
 public class CompilerConstants 
 {
+	public static final int BANK_SIZE = 0x4000;
+	public static final byte NUMBER_OF_BANKS = 64;
+	public static final byte NUMBER_OF_LOADED_BANKS = 2;
+	public static final int MAX_SIZE = BANK_SIZE * NUMBER_OF_BANKS;
+	public static final short MAX_LOADED_SIZE = (short) (BANK_SIZE * NUMBER_OF_LOADED_BANKS);
+	
 	public enum Register
 	{
 		B	(0x0), 
@@ -117,6 +123,23 @@ public class CompilerConstants
 		public byte getValue()
 		{
 			return value;
+		}
+		
+		public InstructionConditions negate()
+		{
+			return negate(this);
+		}
+		
+		public static InstructionConditions negate(InstructionConditions toNegate)
+		{
+			switch(toNegate)
+			{
+				case Z: return NZ;
+				case NZ: return Z;
+				case C: return NC;
+				case NC: return C;
+				default: return NONE;
+			}
 		}
 	}
 }

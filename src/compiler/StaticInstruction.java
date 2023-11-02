@@ -2,6 +2,7 @@ package compiler;
 
 
 import java.io.IOException;
+import java.util.Map;
 
 import gbc_framework.QueuedWriter;
 import gbc_framework.rom_addressing.AssignedAddresses;
@@ -12,6 +13,18 @@ public abstract class StaticInstruction extends FixedLengthInstruct
 	protected StaticInstruction(int size) 
 	{
 		super(size);
+	}
+	
+	@Override
+	public boolean containsPlaceholder()
+	{
+		return false;
+	}
+	
+	@Override
+	public void replacePlaceholderIfPresent(Map<String, String> placeholderToArgs)
+	{
+		// Nothing to do!
 	}
 	
 	@Override

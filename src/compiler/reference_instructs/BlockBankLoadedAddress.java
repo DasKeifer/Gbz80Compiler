@@ -4,39 +4,49 @@ package compiler.reference_instructs;
 import java.io.IOException;
 
 import gbc_framework.QueuedWriter;
-import compiler.FixedLengthInstruct;
+import compiler.LabelReferenceInstruction;
 import gbc_framework.rom_addressing.AssignedAddresses;
 import gbc_framework.rom_addressing.BankAddress;
 import gbc_framework.utils.ByteUtils;
 import gbc_framework.utils.RomUtils;
 
 
-public class BlockBankLoadedAddress extends FixedLengthInstruct
+public class BlockBankLoadedAddress extends LabelReferenceInstruction
 {
-	String addressLabel;
 	boolean includeBank;
+	public static final int SIZE = 2;
 	
 	public BlockBankLoadedAddress(String addressLabel, boolean includeBank)
 	{
-		// Size depends on if the bank is included or not
-		super(includeBank ? 3 : 2);
-		this.addressLabel = addressLabel;
+		super(addressLabel);
 		this.includeBank = includeBank;
 	}
 	
-	@Override
-	public void writeFixedSizeBytes(QueuedWriter writer, BankAddress instructionAddress, AssignedAddresses assignedAddresses) throws IOException 
+	public int getSize()
 	{
-		BankAddress address = assignedAddresses.getThrow(addressLabel);
+		return SIZE;
+	}
+	
+	@Override
+	public int getWorstCaseSize(BankAddress unused1, AssignedAddresses unused2, AssignedAddresses unused3)
+	{
+		return SIZE;
+	}
+	
+	@Override
+	public int writeBytes(QueuedWriter writer, BankAddress unused, AssignedAddresses assignedAddresses) throws IOException
+	{
+		BankAddress address = assignedAddresses.getThrow(getLabel());
 		if (!address.isFullAddress())
 		{
-			throw new IllegalAccessError("BlockBankLoaded Address tried to write address for " + addressLabel + " but it is not fully assigned: " + address.toString());
+			throw new IllegalAccessError("BlockBankLoaded Address tried to write address for " + getLabel() + " but it is not fully assigned: " + address.toString());
 		}
-		
-		if (includeBank)
-		{
-			writer.append(address.getBank());
-		}
-		writer.append(ByteUtils.shortToLittleEndianBytes(RomUtils.convertFromBankOffsetToLoadedOffset(address)));
+		write(writer, address);
+		return SIZE;
+	}
+
+	public static void write(QueuedWriter writer, BankAddress toWrite) throws IOException
+	{
+		writer.append(ByteUtils.shortToLittleEndianBytes(RomUtils.convertFromBankOffsetToLoadedOffset(toWrite)));
 	}
 }

@@ -6,8 +6,7 @@ import java.util.Arrays;
 import gbc_framework.QueuedWriter;
 import compiler.CompilerUtils;
 import compiler.StaticInstruction;
-import compiler.CompilerConstants.InstructionConditions;
-import compiler.reference_instructs.JumpCallCommon;
+import compiler.reference_instructs.Jr;
 
 public class Nop extends StaticInstruction
 {
@@ -75,25 +74,28 @@ public class Nop extends StaticInstruction
 
 		throw new IllegalArgumentException(SUPPORT_STRING + Arrays.toString(args));
 	}
+	
+	public static void writeNops(QueuedWriter writer, int count) throws IOException
+	{
+		for (int i = 0; i < count; i++)
+		{
+			writer.append(NOP_VALUE);
+		}
+	}
 
 	@Override
 	public void writeStaticBytes(QueuedWriter writer) throws IOException
 	{
 		int size = getSize();
-		int offset = 0;
 		
 		// takes 3 cycles to jump so 4 or greater its more efficient to jump
 		if (allowJump && size > 3)
 		{
-			// -2 because its relative to the end of the JR command
-			JumpCallCommon.writeJr(writer, InstructionConditions.NONE, (byte) (size - 2));
-			offset = 2; // Start writing nops after the jump
+			Jr.blankWithJrs(writer, size);
 		}
-		
-		// Write the Nops for the rest of the size for safety
-		for (/*already set*/; offset < size; offset++)
+		else
 		{
-			writer.append(NOP_VALUE);
+			writeNops(writer, size);
 		}
 	}
 }

@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 
 import gbc_framework.QueuedWriter;
-import compiler.reference_instructs.PlaceholderInstruction;
 import gbc_framework.RomConstants;
 import gbc_framework.rom_addressing.AssignedAddresses;
 import gbc_framework.rom_addressing.BankAddress;
@@ -15,7 +14,7 @@ import gbc_framework.rom_addressing.BankAddress.BankAddressLimitType;
 public class Segment
 {
 	List<Instruction> data;
-	List<PlaceholderInstruction> placeholderInstructs;
+	List<Instruction> placeholderInstructs;
 	
 	public Segment()
 	{
@@ -25,13 +24,11 @@ public class Segment
 	
 	public void appendInstruction(Instruction instruct)
 	{
-		data.add(instruct);
-	}
-	
-	public void appendPlaceholderInstruction(PlaceholderInstruction instruct)
-	{
-		appendInstruction(instruct);
-		placeholderInstructs.add(instruct);
+		data.add(instruct);		
+		if (instruct.containsPlaceholder())
+		{
+			placeholderInstructs.add(instruct);
+		}
 	}
 	
 	public int getWorstCaseSize()
@@ -80,11 +77,11 @@ public class Segment
 		}
 	}
 	
-	public void fillPlaceholders(Map<String, String> placeholderToArgs, InstructionParser instructParser)
+	public void replacePlaceholders(Map<String, String> placeholderToArgs)
 	{
-		for (PlaceholderInstruction instruct : placeholderInstructs)
+		for (Instruction instruct : placeholderInstructs)
 		{
-			instruct.fillPlaceholdersAndCreateInstruction(placeholderToArgs, instructParser);
+			instruct.replacePlaceholderIfPresent(placeholderToArgs);
 		}
 	}
 	
