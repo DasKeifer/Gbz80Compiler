@@ -6,6 +6,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import gbc_framework.QueuedWriter;
+import compiler.CompilerUtils;
 import compiler.StaticInstruction;
 
 public class RawBytes extends StaticInstruction
@@ -31,6 +32,17 @@ public class RawBytes extends StaticInstruction
 	{
 		super(determineSize(bytes));
 		allBytes = new LinkedList<>(bytes);
+	}
+	
+	public static RawBytes create(String[] args)
+	{
+		List<byte[]> asBytes = new LinkedList<>();
+		for (String arg : args)
+		{
+			asBytes.add(CompilerUtils.extractBytesFromStrippedHexString(
+					CompilerUtils.extractHexValString(arg)));
+		}
+		return new RawBytes(asBytes);
 	}
 	
 	private static int determineSize(byte[]... bytes)

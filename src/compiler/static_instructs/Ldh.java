@@ -26,7 +26,7 @@ public class Ldh extends StaticInstruction
 	
 	public static Ldh create(String[] args)
 	{		
-		final String SUPPORT_STRING = "Ldh only supports (A, [$FF(00 - FF)]) or ([$FF(00 - FF)], A): Given ";
+		final String SUPPORT_STRING = "Ldh only supports (A, [($|0x)FF(00 - FF)]) or ([($|0x)FF(00 - FF)], A): Given ";
 		if (args.length != 2)
 		{
 			throw new IllegalArgumentException(SUPPORT_STRING + Arrays.toString(args));

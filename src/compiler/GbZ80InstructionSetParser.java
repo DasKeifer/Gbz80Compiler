@@ -15,6 +15,7 @@ import compiler.static_instructs.Nop;
 import compiler.static_instructs.Or;
 import compiler.static_instructs.Pop;
 import compiler.static_instructs.Push;
+import compiler.static_instructs.RawBytes;
 import compiler.static_instructs.Ret;
 import compiler.static_instructs.Rst;
 import compiler.static_instructs.Sub;
@@ -24,7 +25,7 @@ public class GbZ80InstructionSetParser implements InstructionSetParser
 	@Override
 	public List<String> getSupportedInstructions() 
 	{
-		return List.of("lb", "ld", "ldh", "cp", "or", "jr", "jp", "call", "ret", "dec", "inc", "sub", "rst", "pop", "push", "nop");
+		return List.of("lb", "ld", "ldh", "cp", "or", "jr", "jp", "call", "ret", "dec", "inc", "sub", "rst", "pop", "push", "nop", "bytes");
 	}
 
 	@Override
@@ -76,9 +77,8 @@ public class GbZ80InstructionSetParser implements InstructionSetParser
 				return Push.create(splitArgs);
 			case "nop":
 				return Nop.create(splitArgs);
-			// TODO: RawBytes
-				
-			// Writing raw data
+			case "bytes":
+				return RawBytes.create(splitArgs);
 				
 			default:
 				throw new UnsupportedOperationException("Unrecognized instruction: " + instruction);

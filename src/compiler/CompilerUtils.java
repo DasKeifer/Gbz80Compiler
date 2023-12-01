@@ -2,6 +2,7 @@ package compiler;
 
 
 import java.util.Arrays;
+import java.util.regex.Pattern;
 
 import compiler.CompilerConstants.*;
 import gbc_framework.SegmentNamingUtils;
@@ -14,7 +15,10 @@ public final class CompilerUtils
 	static final String SEGMENT_ENDLINE = ":";
 	static final String STRING_QUOTE = "\n";
 	static final String LINE_BREAK = "\n";
-	static final String HEX_VAL_MARKER = "$";
+	static final String HEX_VAL_STANDARD_PREFIX = "0x";
+	static final String HEX_VAL_STANDARD_PREFIX_REGEX = "0x";
+	static final String HEX_VAL_GBZ80_PREFIX = "$";
+	static final String HEX_VAL_GBZ80_PREFIX_REGEX = "\\$";
 	
 	public static String tryParseSegmentName(String line)
 	{
@@ -95,35 +99,64 @@ public final class CompilerUtils
 		}
 		return addr;
 	}
+	
+	public static byte[] extractBytesFromStrippedHexString(String hexString)
+	{
+		// Round up to find num of bytes
+		byte[] bytes = new byte[(hexString.length() + 1) / 2];
+		int startIndex = bytes.length == 1 ? 0 : hexString.length() - 2;
+		for (int byteIdx = bytes.length - 1; byteIdx >= 0; byteIdx--)
+		{
+			bytes[byteIdx] = ByteUtils.parseByte(hexString.substring(startIndex, startIndex + 2));
+			startIndex -= 2;
+		}
+		return bytes;
+	}
+	
+	public static boolean isOnlyHex(String arg)
+	{
+		final Pattern isHex = Pattern.compile("^(" + HEX_VAL_STANDARD_PREFIX_REGEX + "|" + 
+				HEX_VAL_GBZ80_PREFIX_REGEX + ")?[0-9A-Fa-f]+$");
+		return isHex.matcher(arg.trim()).matches();
+	}
 
-	private static String extractHexValString(String arg, int numChars)
+	public static String extractHexValString(String arg)
+	{
+		return extractHexValString(arg, -1, 0);
+	}
+
+	public static String extractHexValString(String arg, int numChars)
 	{
 		return extractHexValString(arg, numChars, 0);
 	}
-
-	public static boolean isHexArg(String arg)
-	{
-		return arg.contains(HEX_VAL_MARKER);
-	}
 	
-	private static String extractHexValString(String arg, int maxNumChars, int offsetChars)
+	public static String extractHexValString(String arg, int maxNumChars, int offsetChars)
 	{
-		int valIdx = arg.indexOf(HEX_VAL_MARKER) + 1;
-		if (valIdx <= 0)
+		int valIdx = arg.indexOf(HEX_VAL_STANDARD_PREFIX) + HEX_VAL_STANDARD_PREFIX.length();
+		if (valIdx < HEX_VAL_STANDARD_PREFIX.length())
 		{
-			throw new IllegalArgumentException("Failed to find the " + HEX_VAL_MARKER + 
-					" hex value marker: " + arg);
+			valIdx = arg.indexOf(HEX_VAL_GBZ80_PREFIX) + HEX_VAL_GBZ80_PREFIX.length();
+			if (valIdx <= HEX_VAL_GBZ80_PREFIX.length())
+			{
+				throw new IllegalArgumentException("Failed to find either " + HEX_VAL_STANDARD_PREFIX + 
+						" or " + HEX_VAL_GBZ80_PREFIX + " hex value marker: " + arg);
+			}
 		}
 		
 		// Handle shorter strings
 		int endIdx = valIdx + maxNumChars + offsetChars;
-		if (endIdx > arg.length())
+		if (endIdx > arg.length() || maxNumChars < 0)
 		{
 			endIdx = arg.length();
 		}
 		
 		// Get the base string, split on space and return the first in case we overflowed into another arg
-		return arg.substring(valIdx + offsetChars, endIdx).split(" ", 2)[0];
+		String hexString = arg.substring(valIdx + offsetChars, endIdx);
+		if (isOnlyHex(hexString))
+		{
+			return hexString;
+		}
+		throw new IllegalArgumentException("Failed parse string - extracted string is not hex: " + hexString);
 	}
 	
 	public static Register parseRegisterArg(String arg)

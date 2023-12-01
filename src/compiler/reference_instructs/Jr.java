@@ -35,7 +35,7 @@ public class Jr extends JumpCommon
 		InstructionConditions conditions = InstructionConditions.NONE;
 		if (args.length == 2)
 		{
-			if (CompilerUtils.isHexArg(args[1]))
+			if (CompilerUtils.isOnlyHex(args[1]))
 			{
 				throw new IllegalArgumentException(offsetError + Arrays.toString(args));
 			}
@@ -54,7 +54,7 @@ public class Jr extends JumpCommon
 		{
 			throw new IllegalArgumentException(supportedArgs + Arrays.toString(args));
 		}
-		else if (CompilerUtils.isHexArg(args[0]))
+		else if (CompilerUtils.isOnlyHex(args[0]))
 		{
 			throw new IllegalArgumentException(offsetError + Arrays.toString(args));
 		}
